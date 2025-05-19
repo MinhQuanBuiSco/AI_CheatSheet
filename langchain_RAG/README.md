@@ -21,7 +21,6 @@ A lightweight Retrieval-Augmented Generation (RAG) API built using **FastAPI**, 
 ├── main.py            # FastAPI app with endpoints
 ├── documents/         # Directory for your .txt files
 ├── .env               # Environment variables
-└── requirements.txt   # Python dependencies
 ```
 
 ---
