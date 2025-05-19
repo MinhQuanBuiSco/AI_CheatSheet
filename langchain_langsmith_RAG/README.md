@@ -29,6 +29,9 @@ A lightweight Retrieval-Augmented Generation (RAG) API built using **FastAPI**, 
 
 ### 1. Install dependencies
 
+To run the code in this project, first, create a Python virtual environment using e.g. `uv`.
+To install `uv`, follow the [UV Installation Guide](https://docs.astral.sh/uv/getting-started/installation/).
+
 ```bash
 uv venv --python 3.10
 uv sync

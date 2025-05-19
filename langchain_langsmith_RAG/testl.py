@@ -1,11 +1,12 @@
-
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage, SystemMessage
-
+from langchain_core.prompts import ChatPromptTemplate
 
 prompt_template = ChatPromptTemplate.from_messages(
     [
-        ("system", "You are a helpful assistant. Answer the user's question based on the provided context. If the context doesn't contain relevant information, say so and provide a general answer."),
+        (
+            "system",
+            "You are a helpful assistant. Answer the user's question based on the provided context. If the context doesn't contain relevant information, say so and provide a general answer.",
+        ),
         ("human", "Context: {context} \n\n Questions: {question}"),
     ]
 )
