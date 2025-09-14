@@ -1,22 +1,68 @@
 dataset:
   name: "bookcorpus"
-  split: "train"
+  split: "train[:1000]"  # Small sample for testing - increase for production
 
 output:
   dir: "./processed_data"
+  format: "parquet"  # Standard format - use "delta" for production
+  compression: "snappy"
+  # partition_by: ["date"]  # Enable for large datasets
 
 filters:
-  min_word_count: 50
+  min_word_count: 10  # Lowered for demo to retain more data
   max_word_count: 10000
-  repetition_threshold: 0.3
+  repetition_threshold: 0.5  # More lenient
   language: "en"
   dedup_threshold: 0.9
   quality_model: "distilbert-base-uncased-finetuned-sst-2-english"
-  quality_threshold: 0.5
+  quality_threshold: 0.2  # More lenient for demo to retain some data
 
 processing:
-  batch_size: 1024
-  num_partitions: 1000
+  batch_size: 32  # Conservative for memory - increase to 1024+ for production
+  num_partitions: 4  # Small for testing - use "auto" for production
+  cache_intermediate: false  # Enable for production: true
+  checkpoint_interval: 20
+  
+spark:
+  # Resource allocation - conservative for local testing
+  dynamic_allocation:
+    enabled: false  # Enable for production clusters
+    min_executors: 1
+    max_executors: 2  # Increase to 50+ for production
+    initial_executors: 1
+  
+  # Memory settings - optimized for local development
+  memory:
+    executor: "1g"  # Increase to 8g+ for production
+    driver: "512m"  # Increase to 4g+ for production
+    executor_memory_fraction: 0.6  # Use 0.8 for production
+    executor_memory_storage_fraction: 0.2  # Use 0.3 for production
+  
+  # Performance tuning
+  sql:
+    adaptive:
+      enabled: true
+      coalesce_partitions: true
+      skew_join: true
+    
+  # Serialization
+  serializer: "org.apache.spark.serializer.KryoSerializer"
+  kryo_registration_required: false
+  
+  # Network
+  network_timeout: "300s"
+  executor_heartbeat_interval: "20s"
+  
+  # Shuffle optimization
+  shuffle:
+    service: true
+    compress: true
+    spill_compress: true
 
+monitoring:
+  metrics_enabled: true
+  checkpoint_dir: "./checkpoints"
+  
 logging:
   level: INFO
+  structured: true
