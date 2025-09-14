@@ -1,0 +1,22 @@
+dataset:
+  name: "bookcorpus"
+  split: "train"
+
+output:
+  dir: "./processed_data"
+
+filters:
+  min_word_count: 50
+  max_word_count: 10000
+  repetition_threshold: 0.3
+  language: "en"
+  dedup_threshold: 0.9
+  quality_model: "distilbert-base-uncased-finetuned-sst-2-english"
+  quality_threshold: 0.5
+
+processing:
+  batch_size: 1024
+  num_partitions: 1000
+
+logging:
+  level: INFO

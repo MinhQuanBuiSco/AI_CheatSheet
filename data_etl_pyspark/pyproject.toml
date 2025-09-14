@@ -1,0 +1,26 @@
+[project]
+name = "data-etl-pyspark"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "MinhQuanBuiSco", email = "quanbm2710@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "datasets==3.6.0",
+    "langdetect>=1.0.9",
+    "pandas>=2.3.2",
+    "pyspark>=4.0.1",
+    "pytest>=8.4.2",
+    "pyyaml>=6.0.2",
+    "torch>=2.8.0",
+    "transformers>=4.56.1",
+]
+
+[project.scripts]
+data-etl-pyspark = "data_etl_pyspark:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
