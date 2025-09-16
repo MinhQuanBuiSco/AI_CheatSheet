@@ -2,7 +2,7 @@
 
 High-performance PySpark pipeline for LLM data preprocessing with big tech-level optimizations.
 
-## =€ Quick Start
+## ğŸš€ Quick Start
 
 ```bash
 # Install dependencies
@@ -15,7 +15,7 @@ python -m data_etl_pyspark.main --config config/config.yaml
 python -m data_etl_pyspark.main --config config/production_config.yaml
 ```
 
-## =Ê Performance Features
+## âš¡ Performance Features
 
 - **60% faster execution** with optimized Spark configurations
 - **38% reduced memory usage** through intelligent caching
@@ -23,16 +23,16 @@ python -m data_etl_pyspark.main --config config/production_config.yaml
 - **Complete observability** with performance monitoring
 - **Data quality validation** at every stage
 
-## =' Configuration
+## âš™ï¸ Configuration
 
 - **`config/config.yaml`** - Memory-efficient for local development/testing
 - **`config/production_config.yaml`** - Full-scale production settings with all optimizations
 
-## =È Optimization Summary
+## ğŸ“Š Optimization Summary
 
 See [`OPTIMIZATION_SUMMARY.md`](OPTIMIZATION_SUMMARY.md) for complete details on performance improvements implemented.
 
-## >ê Testing
+## ğŸ§ª Testing
 
 ```bash
 # Run performance benchmarks
