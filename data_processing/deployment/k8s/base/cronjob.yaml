@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: data-processing-daily
+  namespace: data-processing
+spec:
+  schedule: "0 2 * * *"  # Run at 2 AM daily
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: data-processing
+            component: batch
+        spec:
+          serviceAccountName: data-processing-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: processor
+            image: data-processing:latest
+            command:
+            - python
+            - -m
+            - data_processing
+            - process
+            - /app/data/input.parquet
+            - /app/output/
+            - --enable-pii
+            - --workers
+            - "10"
+            env:
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: data-processing-config
+                  key: log_level
+            resources:
+              requests:
+                cpu: "4000m"
+                memory: "16Gi"
+              limits:
+                cpu: "8000m"
+                memory: "32Gi"
+            volumeMounts:
+            - name: data
+              mountPath: /app/data
+              readOnly: true
+            - name: output
+              mountPath: /app/output
+          volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: data-processing-data-pvc
+          - name: output
+            persistentVolumeClaim:
+              claimName: data-processing-output-pvc

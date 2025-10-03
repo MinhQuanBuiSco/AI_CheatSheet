@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-processing-config
+  namespace: data-processing
+data:
+  log_level: "INFO"
+  num_workers: "10"
+  chunk_size: "10000"
+  max_memory_mb: "16000"
+  enable_pii_detection: "true"
+  enable_metrics: "true"
+  output_format: "parquet"
+  output_compression: "zstd"
