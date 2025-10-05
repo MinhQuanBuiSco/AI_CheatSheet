@@ -11,10 +11,28 @@ from ..core import Pipeline, ProcessorConfig
 from ..privacy import Anonymizer, AnonymizationConfig, AuditLogger, AuditEventType
 from ..monitoring import MetricsCollector, StructuredLogger, ProgressTracker, LogLevel
 from ..analytics import DataClusterer, ClusteringConfig, DataQualityChecker, HierarchyBuilder
-from .config import Config
 
 
 console = Console()
+
+
+# Module-level processor functions (must be at module level for multiprocessing pickling)
+class AnonymizeProcessor:
+    """Anonymization processor that can be pickled for multiprocessing."""
+
+    def __init__(self, anon_config: AnonymizationConfig, audit_logger: AuditLogger, input_path: str):
+        self.anon_config = anon_config
+        self.audit_logger = audit_logger
+        self.input_path = input_path
+        self.anonymizer = Anonymizer(anon_config)
+
+    def __call__(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Process a chunk with anonymization."""
+        anon_df, stats = self.anonymizer.anonymize_dataframe(df)
+        total_anon = sum(stats.values())
+        if total_anon > 0:
+            self.audit_logger.log_pii_anonymization(self.input_path, total_anon)
+        return anon_df
 
 
 @click.group()
@@ -81,15 +99,7 @@ def process(
         if enable_pii:
             console.print("[yellow]Enabling PII detection and anonymization[/yellow]")
             anon_config = AnonymizationConfig()
-            anonymizer = Anonymizer(anon_config)
-
-            def anonymize_processor(df: pl.DataFrame) -> pl.DataFrame:
-                anon_df, stats = anonymizer.anonymize_dataframe(df)
-                total_anon = sum(stats.values())
-                if total_anon > 0:
-                    audit.log_pii_anonymization(str(input_path), total_anon)
-                return anon_df
-
+            anonymize_processor = AnonymizeProcessor(anon_config, audit, str(input_path))
             pipeline.add_processor(anonymize_processor)
 
         # Process file

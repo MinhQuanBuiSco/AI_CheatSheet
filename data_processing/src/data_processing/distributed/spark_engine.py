@@ -60,12 +60,32 @@ class SparkEngine:
         Returns:
             Active Spark session
         """
-        if self._spark is None:
+        if self._spark is None or self._spark.sparkContext._jsc is None:
+            # Create new session if none exists or if existing one is stopped
+            if self._spark is not None:
+                try:
+                    self._spark.stop()
+                except:
+                    pass
             self._spark = self._create_session()
         return self._spark
 
     def _create_session(self) -> SparkSession:
         """Create Spark session with configuration."""
+        # Stop any existing global Spark session that might be stopped
+        try:
+            existing = SparkSession.getActiveSession()
+            if existing:
+                try:
+                    # Test if it's actually alive
+                    existing.sparkContext.defaultParallelism
+                except:
+                    # Session is stopped, clear it
+                    existing.stop()
+                    logger.info("Stopped existing inactive Spark session")
+        except:
+            pass
+
         conf = SparkConf()
 
         # Basic configs
@@ -243,12 +263,19 @@ class SparkEngine:
         spark = self.get_session()
         sc = spark.sparkContext
 
+        # Get active jobs (API changed in PySpark 3.5)
+        try:
+            active_jobs = len(sc.statusTracker().getActiveJobIds())
+        except AttributeError:
+            # Fallback for different PySpark versions
+            active_jobs = 0
+
         return {
             "app_id": sc.applicationId,
             "app_name": sc.appName,
             "master": sc.master,
             "default_parallelism": sc.defaultParallelism,
-            "active_jobs": len(sc.statusTracker().getActiveJobIds()),
+            "active_jobs": active_jobs,
         }
 
     def stop(self) -> None:

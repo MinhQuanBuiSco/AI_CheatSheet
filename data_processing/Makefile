@@ -51,12 +51,12 @@ clean: ## Clean build artifacts
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name '*.pyc' -delete
 
-# Data generation
-generate-data: ## Generate synthetic demo data
-	python examples/generate_synthetic_data.py
+# CLIO Demo
+generate-claude-logs: ## Generate Claude usage logs
+	python examples/generate_claude_usage_logs.py --conversations 10000
 
-demo: ## Run complete demonstration
-	python examples/demo_pipeline.py
+demo: ## Run CLIO demonstration
+	python clio_demo.py
 
 # Docker
 docker-build: ## Build Docker images (all targets)
@@ -78,7 +78,7 @@ docker-up: ## Start Docker Compose stack (all services)
 	docker-compose up -d
 
 docker-up-fast: ## Start Docker Compose (without Spark)
-	docker-compose up -d api postgres redis kafka zookeeper prometheus grafana
+	docker-compose up -d api postgres redis prometheus grafana
 
 docker-down: ## Stop Docker Compose stack
 	docker-compose down

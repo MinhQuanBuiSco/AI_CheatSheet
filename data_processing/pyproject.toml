@@ -33,17 +33,6 @@ api = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
 ]
-validation = [
-    "great-expectations>=0.18.0",
-]
-observability = [
-    "opentelemetry-api>=1.22.0",
-    "opentelemetry-sdk>=1.22.0",
-    "opentelemetry-instrumentation-fastapi>=0.43b0",
-]
-messaging = [
-    "kafka-python>=2.0.2",
-]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
@@ -56,7 +45,7 @@ dev = [
     "ipython>=8.20.0",
 ]
 all = [
-    "data-processing[distributed,api,validation,observability,messaging,dev]"
+    "data-processing[distributed,api,dev]"
 ]
 
 [project.scripts]
