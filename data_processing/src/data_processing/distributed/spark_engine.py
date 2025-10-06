@@ -86,6 +86,9 @@ class SparkEngine:
         except:
             pass
 
+        import os
+        import socket
+
         conf = SparkConf()
 
         # Basic configs
@@ -94,6 +97,13 @@ class SparkEngine:
         conf.set("spark.driver.memory", self.config.driver_memory)
         conf.set("spark.executor.cores", str(self.config.executor_cores))
         conf.set("spark.sql.shuffle.partitions", str(self.config.shuffle_partitions))
+
+        # Driver networking for Kubernetes - use pod IP so executors can reach driver
+        # Get pod IP from environment (set by Kubernetes downward API) or hostname resolution
+        driver_host = os.environ.get('POD_IP') or socket.gethostbyname(socket.gethostname())
+        conf.set("spark.driver.host", driver_host)
+        conf.set("spark.driver.bindAddress", "0.0.0.0")
+        logger.info(f"Spark driver host: {driver_host}")
 
         # Performance optimizations
         if self.config.dynamic_allocation:
@@ -105,12 +115,17 @@ class SparkEngine:
             conf.set("spark.sql.adaptive.enabled", "true")
             conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
 
-        # S3 configuration
+        # S3 configuration with local hadoop-aws JARs (pre-downloaded in Docker image)
+        conf.set("spark.jars", "/app/jars/hadoop-aws-3.3.4.jar,/app/jars/aws-java-sdk-bundle-1.12.262.jar")
+
         if self.config.aws_access_key:
             conf.set("spark.hadoop.fs.s3a.access.key", self.config.aws_access_key)
             conf.set("spark.hadoop.fs.s3a.secret.key", self.config.aws_secret_key)
+            conf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+            conf.set("spark.hadoop.fs.s3a.path.style.access", "true")
             if self.config.s3_endpoint:
                 conf.set("spark.hadoop.fs.s3a.endpoint", self.config.s3_endpoint)
+                conf.set("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
 
         # Kryo serialization for performance
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")

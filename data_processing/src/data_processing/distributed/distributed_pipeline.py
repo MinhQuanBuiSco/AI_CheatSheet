@@ -77,13 +77,13 @@ class DistributedPipeline:
 
     def _select_mode(
         self,
-        file_path: Path,
+        file_path: Union[str, Path],
         file_size_mb: Optional[float] = None,
     ) -> ProcessingMode:
         """Auto-select processing mode based on data characteristics.
 
         Args:
-            file_path: Path to input file
+            file_path: Path to input file (can be S3 path or local Path)
             file_size_mb: File size in MB (will be calculated if not provided)
 
         Returns:
@@ -93,8 +93,18 @@ class DistributedPipeline:
             return self.mode
 
         # Calculate file size if not provided
-        if file_size_mb is None and file_path.exists():
-            file_size_mb = file_path.stat().st_size / 1024 / 1024
+        if file_size_mb is None:
+            # Handle S3 paths
+            if isinstance(file_path, str) and file_path.startswith('s3://'):
+                # For S3 paths, default to Spark since they're typically large datasets
+                logger.info("S3 path detected, using Spark mode for distributed processing")
+                return ProcessingMode.SPARK if SPARK_AVAILABLE else ProcessingMode.LOCAL
+            elif isinstance(file_path, Path) and file_path.exists():
+                file_size_mb = file_path.stat().st_size / 1024 / 1024
+            else:
+                # File doesn't exist or can't determine size, default to local mode
+                logger.warning(f"File not found: {file_path}, defaulting to local mode")
+                return ProcessingMode.LOCAL
 
         # Decision logic
         # Use Spark if:
@@ -105,7 +115,8 @@ class DistributedPipeline:
             logger.info(f"Auto-selected Spark mode (file size: {file_size_mb:.1f} MB)")
             return ProcessingMode.SPARK
 
-        logger.info(f"Auto-selected local mode (file size: {file_size_mb:.1f} MB)")
+        if file_size_mb:
+            logger.info(f"Auto-selected local mode (file size: {file_size_mb:.1f} MB)")
         return ProcessingMode.LOCAL
 
     def add_processor(self, processor: Callable) -> 'DistributedPipeline':
@@ -133,29 +144,37 @@ class DistributedPipeline:
         """Process file using appropriate engine.
 
         Args:
-            input_path: Path to input file
-            output_path: Path to output directory
+            input_path: Path to input file (local or S3 path like s3://bucket/key)
+            output_path: Path to output directory (local or S3 path)
             file_type: File type (parquet, csv, json)
             force_mode: Force specific processing mode
 
         Returns:
             Processing statistics
         """
-        input_path = Path(input_path)
-        output_path = Path(output_path)
+        # Don't convert S3 paths to Path objects
+        if isinstance(input_path, str) and input_path.startswith('s3://'):
+            input_path_obj = input_path
+        else:
+            input_path_obj = Path(input_path)
+
+        if isinstance(output_path, str) and output_path.startswith('s3://'):
+            output_path_obj = output_path
+        else:
+            output_path_obj = Path(output_path)
 
         # Select mode
-        selected_mode = force_mode or self._select_mode(input_path)
+        selected_mode = force_mode or self._select_mode(input_path_obj)
 
         if selected_mode == ProcessingMode.SPARK:
-            return self._process_with_spark(input_path, output_path, file_type)
+            return self._process_with_spark(input_path_obj, output_path_obj, file_type)
         else:
-            return self._process_with_polars(input_path, output_path, file_type)
+            return self._process_with_polars(input_path_obj, output_path_obj, file_type)
 
     def _process_with_polars(
         self,
-        input_path: Path,
-        output_path: Path,
+        input_path: Union[str, Path],
+        output_path: Union[str, Path],
         file_type: str,
     ) -> dict:
         """Process using Polars (local mode).
@@ -189,8 +208,8 @@ class DistributedPipeline:
 
     def _process_with_spark(
         self,
-        input_path: Path,
-        output_path: Path,
+        input_path: Union[str, Path],
+        output_path: Union[str, Path],
         file_type: str,
     ) -> dict:
         """Process using Spark (distributed mode).
@@ -210,13 +229,17 @@ class DistributedPipeline:
 
         engine = self._get_spark_engine()
 
+        # Convert s3:// to s3a:// for Spark
+        input_path_str = str(input_path).replace("s3://", "s3a://")
+        output_path_str = str(output_path).replace("s3://", "s3a://")
+
         # Read data
         if file_type == "parquet":
-            df = engine.read_parquet(str(input_path))
+            df = engine.read_parquet(input_path_str)
         elif file_type == "csv":
-            df = engine.read_csv(str(input_path), header=True, inferSchema=True)
+            df = engine.read_csv(input_path_str, header=True, inferSchema=True)
         elif file_type == "json":
-            df = engine.read_json(str(input_path))
+            df = engine.read_json(input_path_str)
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
 
@@ -226,7 +249,7 @@ class DistributedPipeline:
             pass
 
         # Write output
-        engine.write_parquet(df, str(output_path))
+        engine.write_parquet(df, output_path_str)
 
         # Calculate stats
         record_count = df.count()

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Union
 import time
+import logging
 
 import polars as pl
 import pyarrow as pa
@@ -12,6 +13,9 @@ import pyarrow.parquet as pq
 
 from .processor import ProcessorConfig
 from .storage import StorageHandler, ChunkWriter
+from ..utils.s3 import resolve_path, S3Storage
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -39,18 +43,44 @@ class StreamProcessor:
     ) -> Iterator[pl.DataFrame]:
         """Stream Parquet file in chunks.
 
+        Supports both local files and S3/MinIO paths (s3://bucket/path).
+
         Args:
-            file_path: Path to Parquet file
+            file_path: Path to Parquet file (local or s3://)
             chunk_size: Records per chunk (uses config if not specified)
 
         Yields:
             DataFrame chunks
         """
         chunk_size = chunk_size or self.config.chunk_size
-        file_path = Path(file_path)
 
-        # Use PyArrow for efficient streaming
-        parquet_file = pq.ParquetFile(file_path)
+        # Resolve path (handles S3 if needed)
+        resolved_path, storage_options = resolve_path(file_path)
+
+        if storage_options:
+            # S3/MinIO path - use pyarrow with storage options
+            logger.info(f"Streaming from S3: {resolved_path}")
+            import pyarrow.fs as pafs
+
+            # Create S3 filesystem
+            s3fs = pafs.S3FileSystem(
+                access_key=storage_options['key'],
+                secret_key=storage_options['secret'],
+                endpoint_override=storage_options.get('endpoint_url'),
+                region=storage_options.get('client_kwargs', {}).get('region_name', 'us-east-1')
+            )
+
+            # Parse S3 path
+            bucket, key = S3Storage.parse_s3_path(resolved_path)
+            s3_path = f"{bucket}/{key}"
+
+            # Open and stream Parquet file
+            parquet_file = pq.ParquetFile(s3fs.open_input_file(s3_path))
+        else:
+            # Local file
+            file_path = Path(file_path)
+            logger.debug(f"Streaming from local file: {file_path}")
+            parquet_file = pq.ParquetFile(file_path)
 
         for batch in parquet_file.iter_batches(batch_size=chunk_size):
             # Convert to Polars for efficient processing

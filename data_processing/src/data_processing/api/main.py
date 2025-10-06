@@ -125,9 +125,9 @@ class SparkProcessRequest(BaseModel):
     output_path: str
     file_type: str = "parquet"
     mode: str = "auto"  # auto, local, spark
-    spark_master: Optional[str] = "spark://spark-master:7077"
-    executor_memory: str = "4g"
-    driver_memory: str = "2g"
+    spark_master: Optional[str] = "spark://spark-master:7077"  # Use Spark cluster
+    executor_memory: str = "2g"
+    driver_memory: str = "1g"
     executor_cores: int = 2
     num_executors: int = 2
 
@@ -351,6 +351,10 @@ async def spark_process(request: SparkProcessRequest, background_tasks: Backgrou
     try:
         job_id = str(uuid.uuid4())
 
+        # Debug: Log the received paths
+        logger.info(f"[{WORKER_ID}] Spark Job {job_id} - Received input_path: {request.input_path}")
+        logger.info(f"[{WORKER_ID}] Spark Job {job_id} - Received output_path: {request.output_path}")
+
         print(f"[{WORKER_ID}] Spark Job {job_id} assigned to worker {WORKER_ID}")
 
         # Add background task
@@ -488,7 +492,8 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
         logger.info(f"[Worker {worker_id}] [Spark Job {job_id}] Mode: {request.mode}")
         logger.info(f"[Worker {worker_id}] [Spark Job {job_id}] Master: {request.spark_master}")
 
-        # Create Spark config
+        # Create Spark config with S3 credentials from environment
+        import os
         spark_config = SparkConfig(
             app_name=f"api-job-{job_id}",
             master=request.spark_master,
@@ -496,6 +501,9 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
             driver_memory=request.driver_memory,
             executor_cores=request.executor_cores,
             num_executors=request.num_executors,
+            aws_access_key=os.environ.get('AWS_ACCESS_KEY_ID'),
+            aws_secret_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
+            s3_endpoint=os.environ.get('AWS_ENDPOINT_URL'),
         )
 
         # Create distributed pipeline

@@ -13,6 +13,7 @@ resources:
 - service.yaml
 - hpa.yaml
 - cronjob.yaml
+- minio-deployment.yaml
 
 commonLabels:
   app.kubernetes.io/name: data-processing

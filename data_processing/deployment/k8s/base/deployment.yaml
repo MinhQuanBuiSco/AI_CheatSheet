@@ -8,7 +8,7 @@ metadata:
     component: api
     version: v1
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: data-processing
@@ -30,14 +30,13 @@ spec:
         prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: data-processing-sa
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        fsGroup: 1000
       containers:
       - name: api
-        image: data-processing:latest
-        imagePullPolicy: Always
+        image: data-processing:v1.0.0
+        imagePullPolicy: Never
+        command: ["/opt/venv/bin/uvicorn"]
+        args: ["data_processing.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "/app/src"]
+        workingDir: /app
         ports:
         - name: http
           containerPort: 8000
@@ -67,6 +66,20 @@ spec:
             secretKeyRef:
               name: data-processing-secrets
               key: redis_url
+        # S3/MinIO Configuration (for object storage)
+        - name: AWS_ACCESS_KEY_ID
+          value: "minioadmin"  # Change for production S3
+        - name: AWS_SECRET_ACCESS_KEY
+          value: "minioadmin"  # Change for production S3
+        - name: AWS_ENDPOINT_URL
+          value: "http://minio:9000"  # MinIO endpoint (remove for production S3)
+        - name: AWS_REGION
+          value: "us-east-1"
+        # Pod IP for Spark driver networking (Kubernetes Downward API)
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         resources:
           requests:
             cpu: "500m"
@@ -74,22 +87,6 @@ spec:
           limits:
             cpu: "2000m"
             memory: "4Gi"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: http
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: http
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
         volumeMounts:
         - name: data
           mountPath: /app/data

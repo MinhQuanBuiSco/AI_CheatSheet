@@ -6,10 +6,10 @@ metadata:
 spec:
   accessModes:
   - ReadOnlyMany
-  storageClassName: fast-ssd
+  storageClassName: standard
   resources:
     requests:
-      storage: 100Gi
+      storage: 10Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -19,7 +19,7 @@ metadata:
 spec:
   accessModes:
   - ReadWriteMany
-  storageClassName: fast-ssd
+  storageClassName: standard
   resources:
     requests:
-      storage: 500Gi
+      storage: 20Gi

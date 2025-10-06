@@ -53,7 +53,9 @@ RUN uv venv /opt/venv && \
     faker \
     pyspark==3.5.0 \
     fastapi \
-    "uvicorn[standard]"
+    "uvicorn[standard]" \
+    boto3 \
+    s3fs
 
 # ============================================================================
 # Stage 3: Production runtime
@@ -96,8 +98,15 @@ COPY --chown=appuser:appuser README.md ./
 RUN uv pip install --python /opt/venv/bin/python -e .
 
 # Create necessary directories
-RUN mkdir -p /app/data /app/output /app/logs && \
+RUN mkdir -p /app/data /app/output /app/logs /app/jars && \
     chown -R appuser:appuser /app
+
+# Download Hadoop AWS JARs for Spark S3 support
+RUN curl -L -o /app/jars/hadoop-aws-3.3.4.jar \
+    https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar && \
+    curl -L -o /app/jars/aws-java-sdk-bundle-1.12.262.jar \
+    https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar && \
+    chown -R appuser:appuser /app/jars
 
 # Switch to non-root user
 USER appuser
