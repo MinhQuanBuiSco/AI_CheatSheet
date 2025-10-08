@@ -1,8 +1,0 @@
-pyspark
-datasets
-transformers
-langdetect
-torch
-pandas
-pyyaml
-pytest
