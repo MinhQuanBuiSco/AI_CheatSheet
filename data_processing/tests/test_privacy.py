@@ -1,8 +1,8 @@
 """Tests for privacy features."""
-import polars as pl
-import pytest
 
-from data_processing.privacy import Anonymizer, AnonymizationConfig, PIIDetector, PIIType
+import polars as pl
+
+from data_processing.privacy import AnonymizationConfig, Anonymizer, PIIDetector, PIIType
 
 
 def test_pii_detector_email():
@@ -61,14 +61,16 @@ def test_anonymizer_dataframe():
     config = AnonymizationConfig()
     anonymizer = Anonymizer(config)
 
-    df = pl.DataFrame({
-        "name": ["John Doe", "Jane Smith"],
-        "email": ["john@example.com", "jane@example.com"],
-        "message": [
-            "Contact me at john@example.com",
-            "My phone is 555-1234",
-        ],
-    })
+    df = pl.DataFrame(
+        {
+            "name": ["John Doe", "Jane Smith"],
+            "email": ["john@example.com", "jane@example.com"],
+            "message": [
+                "Contact me at john@example.com",
+                "My phone is 555-1234",
+            ],
+        }
+    )
 
     anonymized_df, stats = anonymizer.anonymize_dataframe(df, ["email", "message"])
 

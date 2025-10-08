@@ -2,18 +2,19 @@
 
 Supports both AWS S3 (production) and MinIO (local development) with automatic detection.
 """
-import os
+
 import logging
+import os
 from pathlib import Path
-from typing import Optional, Union
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
 # Check if S3 libraries are available
 try:
-    import boto3
-    from botocore.exceptions import ClientError, NoCredentialsError
+    import boto3  # type: ignore[import-untyped]
+    from botocore.exceptions import ClientError, NoCredentialsError  # type: ignore[import-untyped]
+
     S3_AVAILABLE = True
 except ImportError:
     S3_AVAILABLE = False
@@ -34,29 +35,29 @@ class S3Storage:
     - AWS_REGION: AWS region (default: us-east-1)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not S3_AVAILABLE:
             raise ImportError("boto3 required for S3/MinIO support. Install: pip install boto3")
 
         # Get configuration from environment
-        self.endpoint_url = os.environ.get('AWS_ENDPOINT_URL')
-        self.region = os.environ.get('AWS_REGION', 'us-east-1')
+        self.endpoint_url = os.environ.get("AWS_ENDPOINT_URL")
+        self.region = os.environ.get("AWS_REGION", "us-east-1")
 
         # Determine if we're using MinIO (local) or S3 (production)
         self.is_minio = self.endpoint_url is not None
 
         # Create S3 client
         self.client = boto3.client(
-            's3',
+            "s3",
             endpoint_url=self.endpoint_url,
             region_name=self.region,
-            aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
+            aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
         )
 
         # For MinIO, we need to configure path-style access
         if self.is_minio:
-            self.client._client_config.s3 = {'addressing_style': 'path'}
+            self.client._client_config.s3 = {"addressing_style": "path"}
             logger.info(f"Using MinIO endpoint: {self.endpoint_url}")
         else:
             logger.info("Using AWS S3")
@@ -76,16 +77,16 @@ class S3Storage:
             ('my-bucket', 'data/file.parquet')
         """
         parsed = urlparse(s3_path)
-        if parsed.scheme != 's3':
+        if parsed.scheme != "s3":
             raise ValueError(f"Invalid S3 path: {s3_path}. Must start with s3://")
 
         bucket = parsed.netloc
-        key = parsed.path.lstrip('/')
+        key = parsed.path.lstrip("/")
 
         return bucket, key
 
     @staticmethod
-    def is_s3_path(path: Union[str, Path]) -> bool:
+    def is_s3_path(path: str | Path) -> bool:
         """Check if path is an S3 URI.
 
         Args:
@@ -94,9 +95,9 @@ class S3Storage:
         Returns:
             True if path starts with s3://
         """
-        return str(path).startswith('s3://')
+        return str(path).startswith("s3://")
 
-    def upload_file(self, local_path: Union[str, Path], s3_path: str) -> None:
+    def upload_file(self, local_path: str | Path, s3_path: str) -> None:
         """Upload file to S3/MinIO.
 
         Args:
@@ -112,7 +113,7 @@ class S3Storage:
             logger.error(f"Failed to upload to S3: {e}")
             raise
 
-    def download_file(self, s3_path: str, local_path: Union[str, Path]) -> None:
+    def download_file(self, s3_path: str, local_path: str | Path) -> None:
         """Download file from S3/MinIO.
 
         Args:
@@ -161,12 +162,12 @@ class S3Storage:
 
         try:
             response = self.client.head_object(Bucket=bucket, Key=key)
-            return response['ContentLength']
+            return int(response["ContentLength"])
         except ClientError as e:
             logger.error(f"Failed to get file size: {e}")
             raise
 
-    def list_files(self, s3_path: str, prefix: str = '') -> list[str]:
+    def list_files(self, s3_path: str, prefix: str = "") -> list[str]:
         """List files in S3/MinIO bucket.
 
         Args:
@@ -181,10 +182,10 @@ class S3Storage:
         try:
             response = self.client.list_objects_v2(Bucket=bucket, Prefix=prefix)
 
-            if 'Contents' not in response:
+            if "Contents" not in response:
                 return []
 
-            return [f"s3://{bucket}/{obj['Key']}" for obj in response['Contents']]
+            return [f"s3://{bucket}/{obj['Key']}" for obj in response["Contents"]]
         except ClientError as e:
             logger.error(f"Failed to list files: {e}")
             raise
@@ -216,40 +217,40 @@ class S3Storage:
                 self.client.create_bucket(Bucket=bucket_name)
             else:
                 # AWS S3 requires location constraint for regions other than us-east-1
-                if self.region == 'us-east-1':
+                if self.region == "us-east-1":
                     self.client.create_bucket(Bucket=bucket_name)
                 else:
                     self.client.create_bucket(
                         Bucket=bucket_name,
-                        CreateBucketConfiguration={'LocationConstraint': self.region}
+                        CreateBucketConfiguration={"LocationConstraint": self.region},
                     )
             logger.info(f"Created bucket: {bucket_name}")
         except ClientError as e:
-            if e.response['Error']['Code'] == 'BucketAlreadyOwnedByYou':
+            if e.response["Error"]["Code"] == "BucketAlreadyOwnedByYou":
                 logger.info(f"Bucket {bucket_name} already exists")
             else:
                 logger.error(f"Failed to create bucket: {e}")
                 raise
 
-    def get_s3fs_storage_options(self) -> dict:
+    def get_s3fs_storage_options(self) -> dict[str, str | dict[str, str]]:
         """Get storage options for s3fs/polars/pyarrow.
 
         Returns:
             Dict of storage options for S3 access
         """
-        options = {
-            'key': os.environ.get('AWS_ACCESS_KEY_ID'),
-            'secret': os.environ.get('AWS_SECRET_ACCESS_KEY'),
+        options: dict[str, str | dict[str, str]] = {
+            "key": os.environ.get("AWS_ACCESS_KEY_ID", ""),
+            "secret": os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
         }
 
         if self.endpoint_url:
-            options['endpoint_url'] = self.endpoint_url
-            options['client_kwargs'] = {'region_name': self.region}
+            options["endpoint_url"] = self.endpoint_url
+            options["client_kwargs"] = {"region_name": self.region}
 
         return options
 
 
-def get_s3_storage() -> Optional[S3Storage]:
+def get_s3_storage() -> S3Storage | None:
     """Get S3Storage instance if configured.
 
     Returns:
@@ -259,7 +260,7 @@ def get_s3_storage() -> Optional[S3Storage]:
         return None
 
     # Check if credentials are configured
-    if not os.environ.get('AWS_ACCESS_KEY_ID'):
+    if not os.environ.get("AWS_ACCESS_KEY_ID"):
         logger.debug("S3 not configured (no AWS_ACCESS_KEY_ID)")
         return None
 
@@ -270,7 +271,7 @@ def get_s3_storage() -> Optional[S3Storage]:
         return None
 
 
-def resolve_path(path: Union[str, Path]) -> tuple[str, Optional[dict]]:
+def resolve_path(path: str | Path) -> tuple[str, dict | None]:
     """Resolve path and return storage options if S3.
 
     Args:

@@ -1,8 +1,8 @@
 """Data encryption for secure storage and processing."""
+
 import base64
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -12,8 +12,9 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 @dataclass
 class EncryptionConfig:
     """Configuration for data encryption."""
+
     key_derivation_iterations: int = 480000
-    salt: bytes = b'anthropic-clio-2024'
+    salt: bytes = b"anthropic-clio-2024"
 
 
 class DataEncryptor:
@@ -89,7 +90,7 @@ class DataEncryptor:
         decrypted = self.decrypt_bytes(encrypted_bytes)
         return decrypted.decode()
 
-    def encrypt_file(self, input_path: Union[str, Path], output_path: Union[str, Path]) -> None:
+    def encrypt_file(self, input_path: str | Path, output_path: str | Path) -> None:
         """Encrypt a file.
 
         Args:
@@ -99,15 +100,15 @@ class DataEncryptor:
         input_path = Path(input_path)
         output_path = Path(output_path)
 
-        with open(input_path, 'rb') as f:
+        with open(input_path, "rb") as f:
             data = f.read()
 
         encrypted = self.encrypt_bytes(data)
 
-        with open(output_path, 'wb') as f:
+        with open(output_path, "wb") as f:
             f.write(encrypted)
 
-    def decrypt_file(self, input_path: Union[str, Path], output_path: Union[str, Path]) -> None:
+    def decrypt_file(self, input_path: str | Path, output_path: str | Path) -> None:
         """Decrypt a file.
 
         Args:
@@ -117,12 +118,12 @@ class DataEncryptor:
         input_path = Path(input_path)
         output_path = Path(output_path)
 
-        with open(input_path, 'rb') as f:
+        with open(input_path, "rb") as f:
             encrypted_data = f.read()
 
         decrypted = self.decrypt_bytes(encrypted_data)
 
-        with open(output_path, 'wb') as f:
+        with open(output_path, "wb") as f:
             f.write(decrypted)
 
     @staticmethod

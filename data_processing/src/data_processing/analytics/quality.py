@@ -1,25 +1,27 @@
 """Data quality checking and reporting."""
+
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Any
+
 import polars as pl
-import numpy as np
 
 
 @dataclass
 class QualityReport:
     """Report of data quality metrics."""
+
     total_records: int
     total_columns: int
-    null_counts: Dict[str, int] = field(default_factory=dict)
-    null_percentages: Dict[str, float] = field(default_factory=dict)
+    null_counts: dict[str, int] = field(default_factory=dict)
+    null_percentages: dict[str, float] = field(default_factory=dict)
     duplicate_count: int = 0
-    unique_counts: Dict[str, int] = field(default_factory=dict)
-    data_types: Dict[str, str] = field(default_factory=dict)
-    numeric_stats: Dict[str, Dict[str, float]] = field(default_factory=dict)
-    issues: List[str] = field(default_factory=list)
+    unique_counts: dict[str, int] = field(default_factory=dict)
+    data_types: dict[str, str] = field(default_factory=dict)
+    numeric_stats: dict[str, dict[str, float]] = field(default_factory=dict)
+    issues: list[str] = field(default_factory=list)
     quality_score: float = 100.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "total_records": self.total_records,
@@ -133,21 +135,33 @@ class DataQualityChecker:
         for col in df.columns:
             if df[col].dtype in numeric_types:
                 try:
+                    mean_val = df[col].mean()
+                    std_val = df[col].std()
+                    min_val = df[col].min()
+                    max_val = df[col].max()
+                    median_val = df[col].median()
+
                     stats = {
-                        "mean": float(df[col].mean()),
-                        "std": float(df[col].std()),
-                        "min": float(df[col].min()),
-                        "max": float(df[col].max()),
-                        "median": float(df[col].median()),
+                        "mean": float(mean_val) if mean_val is not None else 0.0,  # type: ignore[arg-type]
+                        "std": float(std_val) if std_val is not None else 0.0,  # type: ignore[arg-type]
+                        "min": float(min_val) if min_val is not None else 0.0,  # type: ignore[arg-type]
+                        "max": float(max_val) if max_val is not None else 0.0,  # type: ignore[arg-type]
+                        "median": float(median_val) if median_val is not None else 0.0,  # type: ignore[arg-type]
                     }
                     report.numeric_stats[col] = stats
 
                     # Check for outliers using IQR method
                     q1 = df[col].quantile(0.25)
                     q3 = df[col].quantile(0.75)
-                    iqr = q3 - q1
-                    lower_bound = q1 - 1.5 * iqr
-                    upper_bound = q3 + 1.5 * iqr
+
+                    # Handle None values from quantile
+                    if q1 is not None and q3 is not None:
+                        iqr = q3 - q1
+                        lower_bound = q1 - 1.5 * iqr
+                        upper_bound = q3 + 1.5 * iqr
+                    else:
+                        # Skip outlier detection if quantiles are None
+                        continue
 
                     outliers = df.filter(
                         (pl.col(col) < lower_bound) | (pl.col(col) > upper_bound)
@@ -165,27 +179,33 @@ class DataQualityChecker:
 
     def _calculate_quality_score(self, report: QualityReport) -> None:
         """Calculate overall quality score (0-100)."""
-        penalties = 0
+        penalties = 0.0
 
         # Penalize for null values (max 30 points)
-        avg_null_pct = sum(report.null_percentages.values()) / len(report.null_percentages) if report.null_percentages else 0
-        penalties += min(30, avg_null_pct * 0.3)
+        avg_null_pct = (
+            sum(report.null_percentages.values()) / len(report.null_percentages)
+            if report.null_percentages
+            else 0.0
+        )
+        penalties += min(30.0, avg_null_pct * 0.3)
 
         # Penalize for duplicates (max 20 points)
-        duplicate_pct = (report.duplicate_count / report.total_records * 100) if report.total_records > 0 else 0
-        penalties += min(20, duplicate_pct * 2)
+        duplicate_pct = (
+            (report.duplicate_count / report.total_records * 100) if report.total_records > 0 else 0.0
+        )
+        penalties += min(20.0, duplicate_pct * 2)
 
         # Penalize for issues (max 50 points)
-        penalties += min(50, len(report.issues) * 5)
+        penalties += min(50.0, len(report.issues) * 5.0)
 
-        report.quality_score = max(0, 100 - penalties)
+        report.quality_score = max(0.0, 100.0 - penalties)
 
     def validate_schema(
         self,
         df: pl.DataFrame,
-        expected_columns: List[str],
-        expected_types: Optional[Dict[str, type]] = None,
-    ) -> tuple[bool, List[str]]:
+        expected_columns: list[str],
+        expected_types: dict[str, type] | None = None,
+    ) -> tuple[bool, list[str]]:
         """Validate DataFrame schema.
 
         Args:

@@ -51,79 +51,19 @@ clean: ## Clean build artifacts
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name '*.pyc' -delete
 
-# CLIO Demo
-generate-claude-logs: ## Generate Claude usage logs
-	python examples/generate_claude_usage_logs.py --conversations 10000
-
-demo: ## Run CLIO demonstration
+# Interactive Demo
+run-demo: ## Run interactive demo
 	python clio_demo.py
 
-# Docker
-docker-build: ## Build Docker images (all targets)
-	@echo "Building production image..."
-	docker build -t data-processing:latest --target production .
-	@echo "Building development image..."
-	docker build -t data-processing-dev:latest --target development .
-	@echo "Building Spark worker image (this takes time - downloads ~350MB)..."
-	docker build -t data-processing-spark:latest --target spark-worker .
+generate-logs: ## Generate sample data (10K records)
+	python examples/generate_claude_usage_logs.py --conversations 10000
 
-docker-build-fast: ## Build only production and dev images (skip Spark)
-	@echo "Building production image..."
-	docker build -t data-processing:latest --target production .
-	@echo "Building development image..."
-	docker build -t data-processing-dev:latest --target development .
-	@echo "✓ Fast build complete (Spark skipped)"
-
-docker-up: ## Start Docker Compose stack (all services)
-	docker-compose up -d
-
-docker-up-fast: ## Start Docker Compose (without Spark)
-	docker-compose up -d api postgres redis prometheus grafana
-
-docker-down: ## Stop Docker Compose stack
-	docker-compose down
-
-docker-logs: ## Show Docker logs
-	docker-compose logs -f
-
-docker-shell: ## Open shell in development container
-	docker-compose run --rm app /bin/bash
-
-docker-scale-api: ## Scale API to 3 instances
-	docker-compose up -d --scale api=3
-
-docker-scale-api-down: ## Scale API back to 1 instance
-	docker-compose up -d --scale api=1
-
-# Kubernetes
-k8s-deploy: ## Deploy to Kubernetes (using Kustomize)
-	kubectl apply -k deployment/k8s/base/
-
-k8s-delete: ## Delete Kubernetes deployment
-	kubectl delete -k deployment/k8s/base/
-
-k8s-status: ## Check Kubernetes deployment status
-	kubectl get all -n data-processing
-
-k8s-logs: ## Show Kubernetes logs
-	kubectl logs -n data-processing -l app=data-processing --tail=100 -f
-
-# API
+# API (Local Development)
 api-dev: ## Run API server in development mode
 	uvicorn data_processing.api.main:app --reload --host 0.0.0.0 --port 8000
 
 api-prod: ## Run API server in production mode
 	uvicorn data_processing.api.main:app --host 0.0.0.0 --port 8000 --workers 4
-
-# Monitoring
-prometheus-up: ## Start Prometheus
-	docker-compose up -d prometheus
-
-grafana-up: ## Start Grafana
-	docker-compose up -d grafana
-
-monitoring-up: ## Start all monitoring services
-	docker-compose up -d prometheus grafana
 
 # CI/CD
 ci-lint: ## Run CI lint checks
@@ -148,3 +88,108 @@ release-minor: ## Release minor version (0.X.0)
 
 release-major: ## Release major version (X.0.0)
 	bump2version major
+
+# Demo Management (Minikube)
+demo-start: ## Start Minikube and deploy demo
+	@echo "🚀 Starting demo environment..."
+	minikube start --memory=8g --cpus=4 --driver=docker
+	@echo "✓ Minikube started"
+	@echo "Deploying services..."
+	bash scripts/deploy.sh
+	@echo ""
+	@echo "✓ Demo ready!"
+	@echo ""
+	@echo "Access points:"
+	@echo "  • API:        http://localhost:8000"
+	@echo "  • Grafana:    http://localhost:3000 (admin/admin)"
+	@echo "  • Prometheus: http://localhost:9090"
+	@echo "  • Spark UI:   http://localhost:8080"
+	@echo "  • MinIO:      http://localhost:9001 (minioadmin/minioadmin)"
+	@echo ""
+	@echo "Run 'make demo-test' to test the system"
+
+demo-stop: ## Stop Minikube cluster
+	minikube stop
+
+demo-deploy: ## Deploy/redeploy services to Minikube
+	bash scripts/deploy.sh
+
+demo-test: ## Run end-to-end demo test
+	bash scripts/test.sh
+
+demo-status: ## Show demo service status
+	@echo "Minikube Status:"
+	@minikube status || echo "Minikube not running"
+	@echo ""
+	@echo "Kubernetes Pods:"
+	@kubectl get pods -n data-processing 2>/dev/null || echo "Namespace not found"
+	@echo ""
+	@echo "Port Forwards:"
+	@ps aux | grep "port-forward" | grep -v grep || echo "No port forwards running"
+
+demo-logs: ## Show API logs (add SERVICE=spark for other services)
+	kubectl logs -n data-processing -l component=api --tail=100 -f
+
+demo-logs-spark: ## Show Spark logs
+	kubectl logs -n data-processing -l component=spark --tail=100 -f
+
+demo-logs-all: ## Show all service logs
+	kubectl logs -n data-processing --all-containers --tail=50
+
+demo-clean: ## Clean up demo resources
+	kubectl delete namespace data-processing 2>/dev/null || true
+	pkill -f "kubectl port-forward" || true
+	@echo "✓ Demo cleaned up"
+
+demo-rebuild: ## Rebuild and redeploy API (quick iteration)
+	@echo "🔨 Rebuilding API..."
+	docker build --platform linux/arm64 -t data-processing:v1.0.0 -f Dockerfile --target production .
+	@echo "📦 Loading into Minikube..."
+	docker save data-processing:v1.0.0 -o /tmp/data-processing.tar
+	minikube cp /tmp/data-processing.tar /tmp/data-processing.tar
+	minikube ssh "docker load -i /tmp/data-processing.tar"
+	rm -f /tmp/data-processing.tar
+	@echo "🔄 Restarting API..."
+	kubectl rollout restart deployment/data-processing-api -n data-processing
+	kubectl wait --for=condition=ready pod -l component=api -n data-processing --timeout=120s
+	@echo "✓ API rebuilt and restarted"
+
+demo-dashboard: ## Open Grafana dashboard in browser
+	@open http://localhost:3000 || xdg-open http://localhost:3000 || echo "Open http://localhost:3000 in your browser"
+
+demo-port-forward: ## Setup all port forwards
+	@echo "Setting up port forwards..."
+	@kubectl port-forward -n data-processing svc/data-processing-api 8000:80 &
+	@kubectl port-forward -n data-processing svc/grafana 3000:3000 &
+	@kubectl port-forward -n data-processing svc/prometheus 9090:9090 &
+	@kubectl port-forward -n data-processing svc/spark-master 8080:8080 &
+	@kubectl port-forward -n data-processing svc/minio 9000:9000 9001:9001 &
+	@echo "✓ Port forwards started"
+	@echo "Run 'make demo-port-forward-stop' to stop them"
+
+demo-port-forward-stop: ## Stop all port forwards
+	pkill -f "kubectl port-forward" || true
+	@echo "✓ Port forwards stopped"
+
+demo-shell: ## Open shell in API pod
+	kubectl exec -it -n data-processing deployment/data-processing-api -- /bin/bash
+
+demo-restart-api: ## Restart API pods
+	kubectl rollout restart deployment/data-processing-api -n data-processing
+	kubectl wait --for=condition=ready pod -l component=api -n data-processing --timeout=120s
+
+demo-scale-api: ## Scale API to 3 replicas
+	kubectl scale deployment/data-processing-api --replicas=3 -n data-processing
+	@echo "✓ Scaled API to 3 replicas"
+
+demo-scale-down: ## Scale API back to 1 replica
+	kubectl scale deployment/data-processing-api --replicas=1 -n data-processing
+	@echo "✓ Scaled API to 1 replica"
+
+# Quick shortcuts
+demo: demo-start ## Alias for demo-start (Minikube full setup)
+demo-restart: demo-clean demo-start ## Full restart of demo
+demo-quick: demo-rebuild demo-test ## Quick rebuild and test
+
+# Legacy aliases
+run: run-demo ## Alias for run-demo

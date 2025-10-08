@@ -8,6 +8,7 @@ This script generates realistic Claude conversation logs that include:
 
 This simulates the actual data that Anthropic's CLIO team would analyze.
 """
+
 import random
 import string
 from datetime import datetime, timedelta
@@ -36,19 +37,40 @@ class ClaudeUsageSimulator:
         }
 
         self.coding_topics = [
-            "Python debugging", "React component", "SQL query", "API design",
-            "Algorithm optimization", "Code review", "Unit testing", "Async programming",
-            "Data structures", "System design", "Docker configuration", "Git workflow"
+            "Python debugging",
+            "React component",
+            "SQL query",
+            "API design",
+            "Algorithm optimization",
+            "Code review",
+            "Unit testing",
+            "Async programming",
+            "Data structures",
+            "System design",
+            "Docker configuration",
+            "Git workflow",
         ]
 
         self.writing_topics = [
-            "Email draft", "Blog post", "Technical documentation", "Resume",
-            "Cover letter", "Product description", "Marketing copy", "Report summary"
+            "Email draft",
+            "Blog post",
+            "Technical documentation",
+            "Resume",
+            "Cover letter",
+            "Product description",
+            "Marketing copy",
+            "Report summary",
         ]
 
         self.research_topics = [
-            "Literature review", "Data analysis", "Market research", "Competitor analysis",
-            "Technical comparison", "Trend analysis", "Statistical analysis", "Survey design"
+            "Literature review",
+            "Data analysis",
+            "Market research",
+            "Competitor analysis",
+            "Technical comparison",
+            "Trend analysis",
+            "Statistical analysis",
+            "Survey design",
         ]
 
     def generate_conversation(self, conv_id: int, conv_type: str) -> Dict[str, Any]:
@@ -74,9 +96,7 @@ class ClaudeUsageSimulator:
 
         # Generate metadata
         timestamp = datetime.now() - timedelta(
-            days=random.randint(0, 365),
-            hours=random.randint(0, 23),
-            minutes=random.randint(0, 59)
+            days=random.randint(0, 365), hours=random.randint(0, 23), minutes=random.randint(0, 59)
         )
 
         # Add some PII to messages
@@ -200,14 +220,55 @@ class ClaudeUsageSimulator:
     def _generate_name(self) -> str:
         """Generate a realistic name."""
         first_names = [
-            "James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda",
-            "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph", "Jessica",
-            "Thomas", "Sarah", "Charles", "Karen", "Daniel", "Nancy", "Matthew", "Lisa"
+            "James",
+            "Mary",
+            "John",
+            "Patricia",
+            "Robert",
+            "Jennifer",
+            "Michael",
+            "Linda",
+            "William",
+            "Elizabeth",
+            "David",
+            "Barbara",
+            "Richard",
+            "Susan",
+            "Joseph",
+            "Jessica",
+            "Thomas",
+            "Sarah",
+            "Charles",
+            "Karen",
+            "Daniel",
+            "Nancy",
+            "Matthew",
+            "Lisa",
         ]
         last_names = [
-            "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis",
-            "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson",
-            "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee", "Thompson", "White"
+            "Smith",
+            "Johnson",
+            "Williams",
+            "Brown",
+            "Jones",
+            "Garcia",
+            "Miller",
+            "Davis",
+            "Rodriguez",
+            "Martinez",
+            "Hernandez",
+            "Lopez",
+            "Gonzalez",
+            "Wilson",
+            "Anderson",
+            "Thomas",
+            "Taylor",
+            "Moore",
+            "Jackson",
+            "Martin",
+            "Lee",
+            "Thompson",
+            "White",
         ]
         return f"{random.choice(first_names)} {random.choice(last_names)}"
 
@@ -269,17 +330,27 @@ class ClaudeUsageSimulator:
 
         # Show statistics
         console.print("\n[bold]Conversation Type Distribution:[/bold]")
-        type_counts = df.group_by("conversation_type").agg(pl.count().alias("count")).sort("count", descending=True)
+        type_counts = (
+            df.group_by("conversation_type")
+            .agg(pl.count().alias("count"))
+            .sort("count", descending=True)
+        )
         for row in type_counts.iter_rows(named=True):
-            console.print(f"  {row['conversation_type']}: {row['count']:,} ({row['count']/len(df)*100:.1f}%)")
+            console.print(
+                f"  {row['conversation_type']}: {row['count']:,} ({row['count']/len(df)*100:.1f}%)"
+            )
 
         console.print(f"\n[bold]Model Distribution:[/bold]")
-        model_counts = df.group_by("model").agg(pl.count().alias("count")).sort("count", descending=True)
+        model_counts = (
+            df.group_by("model").agg(pl.count().alias("count")).sort("count", descending=True)
+        )
         for row in model_counts.iter_rows(named=True):
             console.print(f"  {row['model']}: {row['count']:,}")
 
         console.print(f"\n[bold]Regions:[/bold]")
-        region_counts = df.group_by("region").agg(pl.count().alias("count")).sort("count", descending=True)
+        region_counts = (
+            df.group_by("region").agg(pl.count().alias("count")).sort("count", descending=True)
+        )
         for row in region_counts.iter_rows(named=True):
             console.print(f"  {row['region']}: {row['count']:,}")
 
@@ -295,13 +366,13 @@ def main():
         "--conversations",
         type=int,
         default=100000,
-        help="Number of conversations to generate (default: 100,000)"
+        help="Number of conversations to generate (default: 100,000)",
     )
     parser.add_argument(
         "--output",
         type=str,
         default="demo_data/claude_usage_logs.parquet",
-        help="Output file path (default: demo_data/claude_usage_logs.parquet)"
+        help="Output file path (default: demo_data/claude_usage_logs.parquet)",
     )
 
     args = parser.parse_args()
@@ -338,9 +409,13 @@ def main():
     console.print("\n[bold green]✓ Claude usage logs generated successfully![/bold green]")
     console.print("\n[bold]Next Steps:[/bold]")
     console.print("1. Analyze with privacy preservation:")
-    console.print(f"   [cyan]python -m data_processing process {output_path} demo_output/ --enable-pii[/cyan]")
+    console.print(
+        f"   [cyan]python -m data_processing process {output_path} demo_output/ --enable-pii[/cyan]"
+    )
     console.print("\n2. Cluster conversations by topic:")
-    console.print(f"   [cyan]python -m data_processing cluster {output_path} user_message --num-clusters 10[/cyan]")
+    console.print(
+        f"   [cyan]python -m data_processing cluster {output_path} user_message --num-clusters 10[/cyan]"
+    )
     console.print("\n3. Run quality check:")
     console.print(f"   [cyan]python -m data_processing quality-check {output_path}[/cyan]")
     console.print()
@@ -353,6 +428,7 @@ if __name__ == "__main__":
     except ImportError:
         print("Installing required packages...")
         import subprocess
+
         subprocess.run(["pip", "install", "rich"], check=True)
         from rich.console import Console
         from rich.progress import track

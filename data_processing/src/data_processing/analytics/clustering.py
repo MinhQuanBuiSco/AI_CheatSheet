@@ -1,16 +1,18 @@
 """Data clustering using embeddings and ML algorithms."""
+
 from dataclasses import dataclass
-from typing import List, Optional, Union
+
 import numpy as np
 import polars as pl
-from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
-from sklearn.preprocessing import StandardScaler
 from sentence_transformers import SentenceTransformer
+from sklearn.cluster import DBSCAN, AgglomerativeClustering, KMeans  # type: ignore[import-untyped]
+from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
 
 @dataclass
 class ClusteringConfig:
     """Configuration for clustering operations."""
+
     algorithm: str = "kmeans"  # kmeans, dbscan, hierarchical
     num_clusters: int = 5
     embedding_model: str = "all-MiniLM-L6-v2"
@@ -28,8 +30,8 @@ class DataClusterer:
 
     def __init__(self, config: ClusteringConfig):
         self.config = config
-        self._embedding_model: Optional[SentenceTransformer] = None
-        self._scaler: Optional[StandardScaler] = None
+        self._embedding_model: SentenceTransformer | None = None
+        self._scaler: StandardScaler | None = None
 
     def _get_embedding_model(self) -> SentenceTransformer:
         """Lazy load embedding model."""
@@ -37,7 +39,7 @@ class DataClusterer:
             self._embedding_model = SentenceTransformer(self.config.embedding_model)
         return self._embedding_model
 
-    def generate_embeddings(self, texts: List[str]) -> np.ndarray:
+    def generate_embeddings(self, texts: list[str]) -> np.ndarray:
         """Generate embeddings for texts.
 
         Args:
@@ -53,7 +55,7 @@ class DataClusterer:
     def cluster_embeddings(
         self,
         embeddings: np.ndarray,
-        algorithm: Optional[str] = None,
+        algorithm: str | None = None,
     ) -> np.ndarray:
         """Cluster embeddings using specified algorithm.
 
@@ -96,13 +98,13 @@ class DataClusterer:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
 
         labels = clusterer.fit_predict(embeddings_scaled)
-        return labels
+        return labels  # type: ignore[no-any-return]
 
     def cluster_texts(
         self,
-        texts: List[str],
+        texts: list[str],
         return_embeddings: bool = False,
-    ) -> Union[np.ndarray, tuple[np.ndarray, np.ndarray]]:
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """Cluster texts end-to-end.
 
         Args:
@@ -141,9 +143,7 @@ class DataClusterer:
         texts = df[text_column].to_list()
         labels = self.cluster_texts(texts)
 
-        return df.with_columns(
-            pl.Series(label_column, labels)
-        )
+        return df.with_columns(pl.Series(label_column, labels))
 
     def get_cluster_summaries(
         self,
@@ -184,9 +184,9 @@ class DataClusterer:
     def find_similar(
         self,
         query: str,
-        texts: List[str],
+        texts: list[str],
         top_k: int = 5,
-    ) -> List[tuple[int, float]]:
+    ) -> list[tuple[int, float]]:
         """Find similar texts to query.
 
         Args:

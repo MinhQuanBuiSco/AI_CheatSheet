@@ -1,17 +1,16 @@
 """CLI commands for data processing."""
+
 import time
 from pathlib import Path
-from typing import Optional
 
 import click
 import polars as pl
 from rich.console import Console
 
+from ..analytics import ClusteringConfig, DataClusterer, DataQualityChecker
 from ..core import Pipeline, ProcessorConfig
-from ..privacy import Anonymizer, AnonymizationConfig, AuditLogger, AuditEventType
-from ..monitoring import MetricsCollector, StructuredLogger, ProgressTracker, LogLevel
-from ..analytics import DataClusterer, ClusteringConfig, DataQualityChecker, HierarchyBuilder
-
+from ..monitoring import MetricsCollector, ProgressTracker, StructuredLogger
+from ..privacy import AnonymizationConfig, Anonymizer, AuditLogger
 
 console = Console()
 
@@ -20,7 +19,9 @@ console = Console()
 class AnonymizeProcessor:
     """Anonymization processor that can be pickled for multiprocessing."""
 
-    def __init__(self, anon_config: AnonymizationConfig, audit_logger: AuditLogger, input_path: str):
+    def __init__(
+        self, anon_config: AnonymizationConfig, audit_logger: AuditLogger, input_path: str
+    ):
         self.anon_config = anon_config
         self.audit_logger = audit_logger
         self.input_path = input_path
@@ -37,7 +38,7 @@ class AnonymizeProcessor:
 
 @click.group()
 @click.version_option(version="0.1.0")
-def cli():
+def cli() -> None:
     """Anthropic-level data processing infrastructure.
 
     High-performance, privacy-preserving data processing with monitoring,
@@ -49,7 +50,9 @@ def cli():
 @cli.command()
 @click.argument("input_file", type=click.Path(exists=True))
 @click.argument("output_dir", type=click.Path())
-@click.option("--format", "file_format", default="parquet", help="Input file format (parquet, json, csv)")
+@click.option(
+    "--format", "file_format", default="parquet", help="Input file format (parquet, json, csv)"
+)
 @click.option("--workers", default=10, help="Number of worker processes")
 @click.option("--chunk-size", default=10000, help="Records per chunk")
 @click.option("--enable-pii", is_flag=True, help="Enable PII detection and anonymization")
@@ -63,8 +66,8 @@ def process(
     chunk_size: int,
     enable_pii: bool,
     enable_clustering: bool,
-    text_column: Optional[str],
-):
+    text_column: str | None,
+) -> None:
     """Process a data file through the pipeline."""
     input_path = Path(input_file)
     output_path = Path(output_dir)
@@ -161,7 +164,7 @@ def process(
 
 @cli.command()
 @click.argument("input_file", type=click.Path(exists=True))
-def quality_check(input_file: str):
+def quality_check(input_file: str) -> None:
     """Run data quality checks on a file."""
     input_path = Path(input_file)
 
@@ -207,7 +210,7 @@ def quality_check(input_file: str):
 @click.argument("text_column")
 @click.option("--num-clusters", default=5, help="Number of clusters")
 @click.option("--output", default="clusters.parquet", help="Output file")
-def cluster(input_file: str, text_column: str, num_clusters: int, output: str):
+def cluster(input_file: str, text_column: str, num_clusters: int, output: str) -> None:
     """Cluster data based on text embeddings."""
     input_path = Path(input_file)
     output_path = Path(output)
@@ -232,11 +235,13 @@ def cluster(input_file: str, text_column: str, num_clusters: int, output: str):
 
     # Show summaries
     summaries = clusterer.get_cluster_summaries(clustered_df, text_column)
-    console.print(f"\n[bold]Cluster Summaries:[/bold]")
+    console.print("\n[bold]Cluster Summaries:[/bold]")
     for cluster_id, summary in summaries.items():
-        console.print(f"\n  Cluster {cluster_id}: {summary['size']} records ({summary['percentage']:.1f}%)")
-        console.print(f"  Samples:")
-        for sample in summary['samples'][:3]:
+        console.print(
+            f"\n  Cluster {cluster_id}: {summary['size']} records ({summary['percentage']:.1f}%)"
+        )
+        console.print("  Samples:")
+        for sample in summary["samples"][:3]:
             console.print(f"    - {sample[:100]}...")
 
 
@@ -245,7 +250,7 @@ def cluster(input_file: str, text_column: str, num_clusters: int, output: str):
 @click.option("--text-column", required=True, help="Text column to anonymize")
 @click.option("--output", default="anonymized.parquet", help="Output file")
 @click.option("--method", default="hash", help="Anonymization method (hash, mask, redact)")
-def anonymize(input_file: str, text_column: str, output: str, method: str):
+def anonymize(input_file: str, text_column: str, output: str, method: str) -> None:
     """Anonymize PII in data."""
     input_path = Path(input_file)
     output_path = Path(output)
@@ -273,11 +278,12 @@ def anonymize(input_file: str, text_column: str, output: str, method: str):
 
 
 @cli.command()
-def info():
+def info() -> None:
     """Display system information."""
-    import platform
     import multiprocessing as mp
-    import psutil
+    import platform
+
+    import psutil  # type: ignore[import-untyped]
 
     console.print("[bold cyan]System Information[/bold cyan]\n")
 
@@ -292,6 +298,214 @@ def info():
     # Check for Apple Silicon
     if platform.machine() == "arm64" and platform.system() == "Darwin":
         console.print("\n[green]✓ Running on Apple Silicon (optimizations enabled)[/green]")
+
+
+# Minikube Demo Commands
+@cli.group()
+def demo() -> None:
+    """Minikube demo management commands."""
+    pass
+
+
+@demo.command()
+@click.option("--memory", default="8g", help="Memory allocation (default: 8g)")
+@click.option("--cpus", default=4, help="CPU cores (default: 4)")
+def start(memory: str, cpus: int) -> None:
+    """Start Minikube cluster for demo."""
+    import subprocess
+
+    console.print("[bold cyan]Starting Minikube cluster...[/bold cyan]\n")
+
+    try:
+        # Start Minikube
+        cmd = ["minikube", "start", f"--memory={memory}", f"--cpus={cpus}", "--driver=docker"]
+        subprocess.run(cmd, check=True)
+
+        console.print("\n[green]✓ Minikube started successfully![/green]")
+        console.print("\nNext steps:")
+        console.print("  1. data-processing demo deploy")
+        console.print("  2. data-processing demo test")
+
+    except subprocess.CalledProcessError as e:
+        console.print(f"\n[red]✗ Failed to start Minikube: {e}[/red]")
+        raise
+
+
+@demo.command()
+def stop() -> None:
+    """Stop Minikube cluster."""
+    import subprocess
+
+    console.print("[bold cyan]Stopping Minikube...[/bold cyan]")
+
+    try:
+        subprocess.run(["minikube", "stop"], check=True)
+        console.print("[green]✓ Minikube stopped[/green]")
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]✗ Failed: {e}[/red]")
+
+
+@demo.command()
+def deploy() -> None:
+    """Deploy all services to Minikube."""
+    import subprocess
+
+    console.print("[bold cyan]Deploying to Minikube...[/bold cyan]\n")
+
+    try:
+        # Run deploy script
+        result = subprocess.run(
+            ["bash", "scripts/deploy.sh"], cwd=Path.cwd(), capture_output=True, text=True
+        )
+
+        if result.returncode == 0:
+            console.print("\n[green]✓ Deployment complete![/green]")
+            console.print("\nAccess points:")
+            console.print("  • API:        http://localhost:8000")
+            console.print("  • Grafana:    http://localhost:3000 (admin/admin)")
+            console.print("  • Prometheus: http://localhost:9090")
+            console.print("  • Spark UI:   http://localhost:8080")
+            console.print("  • MinIO:      http://localhost:9001 (minioadmin/minioadmin)")
+        else:
+            console.print("[red]✗ Deployment failed[/red]")
+            console.print(result.stderr)
+
+    except Exception as e:
+        console.print(f"[red]✗ Error: {e}[/red]")
+
+
+@demo.command()
+def test() -> None:
+    """Run end-to-end test on the demo."""
+    import subprocess
+
+    console.print("[bold cyan]Running end-to-end test...[/bold cyan]\n")
+
+    try:
+        result = subprocess.run(
+            ["bash", "scripts/test.sh"], cwd=Path.cwd(), capture_output=False, text=True
+        )
+
+        if result.returncode == 0:
+            console.print("\n[green]✓ Test passed![/green]")
+        else:
+            console.print("\n[red]✗ Test failed[/red]")
+
+    except Exception as e:
+        console.print(f"[red]✗ Error: {e}[/red]")
+
+
+@demo.command()
+def status() -> None:
+    """Show status of all services."""
+    import subprocess
+
+    console.print("[bold cyan]Service Status[/bold cyan]\n")
+
+    try:
+        # Minikube status
+        result = subprocess.run(["minikube", "status"], capture_output=True, text=True)
+        console.print("[bold]Minikube:[/bold]")
+        console.print(result.stdout)
+
+        # Kubernetes pods
+        result = subprocess.run(
+            ["kubectl", "get", "pods", "-n", "data-processing"], capture_output=True, text=True
+        )
+        console.print("\n[bold]Pods:[/bold]")
+        console.print(result.stdout)
+
+        # Port forwards
+        result = subprocess.run(["ps", "aux"], capture_output=True, text=True)
+        port_forwards = [line for line in result.stdout.split("\n") if "port-forward" in line]
+        if port_forwards:
+            console.print("\n[bold]Port Forwards:[/bold]")
+            for pf in port_forwards:
+                console.print(f"  {pf.split()[-1]}")
+
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]✗ Error: {e}[/red]")
+
+
+@demo.command()
+@click.option(
+    "--service", default="api", help="Service to view logs (api, spark, minio, prometheus, grafana)"
+)
+@click.option("--follow", "-f", is_flag=True, help="Follow logs")
+@click.option("--tail", default=100, help="Number of lines to show")
+def logs(service: str, follow: bool, tail: int) -> None:
+    """View logs from demo services."""
+    import subprocess
+
+    service_map = {
+        "api": "component=api",
+        "spark": "component=spark",
+        "minio": "app=minio",
+        "prometheus": "app=prometheus",
+        "grafana": "app=grafana",
+    }
+
+    label = service_map.get(service)
+    if not label:
+        console.print(f"[red]Unknown service: {service}[/red]")
+        console.print(f"Available services: {', '.join(service_map.keys())}")
+        return
+
+    cmd = ["kubectl", "logs", "-n", "data-processing", "-l", label, f"--tail={tail}"]
+    if follow:
+        cmd.append("-f")
+
+    try:
+        subprocess.run(cmd)
+    except KeyboardInterrupt:
+        pass
+
+
+@demo.command()
+def clean() -> None:
+    """Clean up demo resources."""
+    import subprocess
+
+    console.print("[bold cyan]Cleaning up demo resources...[/bold cyan]\n")
+
+    try:
+        # Delete namespace
+        subprocess.run(["kubectl", "delete", "namespace", "data-processing"], check=True)
+        console.print("[green]✓ Namespace deleted[/green]")
+
+        # Kill port forwards
+        subprocess.run(["pkill", "-f", "kubectl port-forward"])
+        console.print("[green]✓ Port forwards stopped[/green]")
+
+        console.print("\n[green]✓ Cleanup complete![/green]")
+
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]✗ Error: {e}[/red]")
+
+
+@demo.command()
+def dashboard() -> None:
+    """Open Grafana dashboard in browser."""
+    import subprocess
+    import webbrowser
+
+    console.print("[bold cyan]Opening Grafana dashboard...[/bold cyan]")
+
+    # Check if port forward is running
+    result = subprocess.run(["ps", "aux"], capture_output=True, text=True)
+
+    if "grafana" not in result.stdout or "port-forward" not in result.stdout:
+        console.print("[yellow]Port forward not found, starting...[/yellow]")
+        subprocess.Popen(
+            ["kubectl", "port-forward", "-n", "data-processing", "svc/grafana", "3000:3000"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        time.sleep(2)
+
+    webbrowser.open("http://localhost:3000")
+    console.print("[green]✓ Dashboard opened in browser[/green]")
+    console.print("Default credentials: admin / admin")
 
 
 if __name__ == "__main__":

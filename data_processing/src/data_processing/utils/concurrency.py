@@ -1,9 +1,10 @@
 """Concurrency utilities optimized for Mac M4."""
+
 import multiprocessing as mp
 import os
 import platform
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from typing import Optional
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
+from typing import Any
 
 
 def get_optimal_workers(task_type: str = "cpu") -> int:
@@ -53,7 +54,7 @@ class OptimizedExecutor:
     def __init__(
         self,
         task_type: str = "cpu",
-        max_workers: Optional[int] = None,
+        max_workers: int | None = None,
         use_threads: bool = False,
     ):
         """Initialize executor.
@@ -73,6 +74,7 @@ class OptimizedExecutor:
             os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
             os.environ.setdefault("OMP_NUM_THREADS", "1")
 
+        self.executor: Executor
         if use_threads:
             self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
         else:
@@ -83,20 +85,21 @@ class OptimizedExecutor:
                 mp_context=ctx,
             )
 
-    def __enter__(self):
-        return self.executor.__enter__()
+    def __enter__(self) -> "OptimizedExecutor":
+        self.executor.__enter__()
+        return self
 
-    def __exit__(self, *args):
-        return self.executor.__exit__(*args)
+    def __exit__(self, *args: Any) -> None:
+        self.executor.__exit__(*args)
 
-    def submit(self, fn, *args, **kwargs):
+    def submit(self, fn: Any, *args: Any, **kwargs: Any) -> Any:
         """Submit a task."""
         return self.executor.submit(fn, *args, **kwargs)
 
-    def map(self, fn, *iterables, **kwargs):
+    def map(self, fn: Any, *iterables: Any, **kwargs: Any) -> Any:
         """Map function over iterables."""
         return self.executor.map(fn, *iterables, **kwargs)
 
-    def shutdown(self, wait=True):
+    def shutdown(self, wait: bool = True) -> None:
         """Shutdown executor."""
         self.executor.shutdown(wait=wait)

@@ -1,15 +1,17 @@
 """Audit logging for data access and processing."""
-import json
-from dataclasses import dataclass, asdict
+
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
+
 import orjson
 
 
 class AuditEventType(Enum):
     """Types of audit events."""
+
     DATA_ACCESS = "data_access"
     DATA_PROCESSING = "data_processing"
     PII_DETECTED = "pii_detected"
@@ -23,30 +25,31 @@ class AuditEventType(Enum):
 @dataclass
 class AuditEvent:
     """Represents an auditable event."""
+
     timestamp: str
     event_type: AuditEventType
     user: str
     action: str
     resource: str
-    details: Dict[str, Any]
+    details: dict[str, Any]
     success: bool = True
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
             Dictionary representation
         """
         data = asdict(self)
-        data['event_type'] = self.event_type.value
+        data["event_type"] = self.event_type.value
         return data
 
 
 class AuditLogger:
     """Logs audit events for compliance and security."""
 
-    def __init__(self, log_path: Union[str, Path], user: str = "system"):
+    def __init__(self, log_path: str | Path, user: str = "system"):
         self.log_path = Path(log_path)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self.user = user
@@ -57,9 +60,9 @@ class AuditLogger:
         event_type: AuditEventType,
         action: str,
         resource: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
         success: bool = True,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ) -> None:
         """Log an audit event.
 
@@ -83,13 +86,13 @@ class AuditLogger:
         )
 
         # Append to log file
-        with open(self.log_path, 'ab') as f:
+        with open(self.log_path, "ab") as f:
             f.write(orjson.dumps(event.to_dict()))
-            f.write(b'\n')
+            f.write(b"\n")
 
         self._event_count += 1
 
-    def log_data_access(self, resource: str, **kwargs) -> None:
+    def log_data_access(self, resource: str, **kwargs: Any) -> None:
         """Log data access event."""
         self.log_event(
             AuditEventType.DATA_ACCESS,
@@ -98,7 +101,7 @@ class AuditLogger:
             kwargs,
         )
 
-    def log_data_processing(self, resource: str, records_processed: int, **kwargs) -> None:
+    def log_data_processing(self, resource: str, records_processed: int, **kwargs: Any) -> None:
         """Log data processing event."""
         details = {"records_processed": records_processed, **kwargs}
         self.log_event(
@@ -126,7 +129,7 @@ class AuditLogger:
             {"anonymization_count": anonymization_count},
         )
 
-    def log_encryption(self, resource: str, **kwargs) -> None:
+    def log_encryption(self, resource: str, **kwargs: Any) -> None:
         """Log encryption event."""
         self.log_event(
             AuditEventType.ENCRYPTION,
@@ -135,7 +138,7 @@ class AuditLogger:
             kwargs,
         )
 
-    def log_decryption(self, resource: str, **kwargs) -> None:
+    def log_decryption(self, resource: str, **kwargs: Any) -> None:
         """Log decryption event."""
         self.log_event(
             AuditEventType.DECRYPTION,
@@ -144,7 +147,7 @@ class AuditLogger:
             kwargs,
         )
 
-    def log_export(self, resource: str, destination: str, **kwargs) -> None:
+    def log_export(self, resource: str, destination: str, **kwargs: Any) -> None:
         """Log data export event."""
         details = {"destination": destination, **kwargs}
         self.log_event(
@@ -175,9 +178,9 @@ class AuditLogger:
 
     def query_events(
         self,
-        event_type: Optional[AuditEventType] = None,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        event_type: AuditEventType | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
     ) -> list[AuditEvent]:
         """Query audit events.
 
@@ -189,12 +192,12 @@ class AuditLogger:
         Returns:
             List of matching events
         """
-        events = []
+        events: list[AuditEvent] = []
 
         if not self.log_path.exists():
             return events
 
-        with open(self.log_path, 'rb') as f:
+        with open(self.log_path, "rb") as f:
             for line in f:
                 if not line.strip():
                     continue
@@ -202,25 +205,25 @@ class AuditLogger:
                 data = orjson.loads(line)
 
                 # Apply filters
-                if event_type and data['event_type'] != event_type.value:
+                if event_type and data["event_type"] != event_type.value:
                     continue
 
-                if start_time and data['timestamp'] < start_time:
+                if start_time and data["timestamp"] < start_time:
                     continue
 
-                if end_time and data['timestamp'] > end_time:
+                if end_time and data["timestamp"] > end_time:
                     continue
 
                 # Reconstruct event
                 event = AuditEvent(
-                    timestamp=data['timestamp'],
-                    event_type=AuditEventType(data['event_type']),
-                    user=data['user'],
-                    action=data['action'],
-                    resource=data['resource'],
-                    details=data['details'],
-                    success=data['success'],
-                    error_message=data.get('error_message'),
+                    timestamp=data["timestamp"],
+                    event_type=AuditEventType(data["event_type"]),
+                    user=data["user"],
+                    action=data["action"],
+                    resource=data["resource"],
+                    details=data["details"],
+                    success=data["success"],
+                    error_message=data.get("error_message"),
                 )
                 events.append(event)
 

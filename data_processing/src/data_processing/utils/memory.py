@@ -1,9 +1,9 @@
 """Memory management utilities."""
+
 import gc
-import sys
-from typing import Optional
-import psutil
+
 import polars as pl
+import psutil  # type: ignore[import-untyped]
 
 
 class MemoryMonitor:
@@ -22,13 +22,13 @@ class MemoryMonitor:
     def get_current_mb(self) -> float:
         """Get current memory usage in MB."""
         memory_info = self._process.memory_info()
-        current_mb = memory_info.rss / 1024 / 1024
+        current_mb = float(memory_info.rss / 1024 / 1024)
         self._peak_memory = max(self._peak_memory, current_mb)
         return current_mb
 
     def get_available_mb(self) -> float:
         """Get available system memory in MB."""
-        return psutil.virtual_memory().available / 1024 / 1024
+        return float(psutil.virtual_memory().available / 1024 / 1024)
 
     def get_peak_mb(self) -> float:
         """Get peak memory usage in MB."""
@@ -81,7 +81,7 @@ def estimate_dataframe_memory(df: pl.DataFrame) -> float:
     # Polars is more memory-efficient than Pandas
     # Estimate based on number of rows and columns
     num_rows = len(df)
-    num_cols = len(df.columns)
+    len(df.columns)
 
     total_bytes = 0
 

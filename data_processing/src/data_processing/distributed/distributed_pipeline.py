@@ -1,26 +1,27 @@
 """Unified pipeline supporting both local (Polars) and distributed (Spark) processing."""
+
+import logging
+from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
-from typing import Callable, List, Optional, Union
-import logging
 
-from .spark_engine import SparkEngine, SparkConfig, SPARK_AVAILABLE
+from .spark_engine import SPARK_AVAILABLE, SparkConfig, SparkEngine
 
 if SPARK_AVAILABLE:
-    from pyspark.sql import DataFrame as SparkDataFrame
+    pass
 
-import polars as pl
-from ..core import Pipeline as PolarsPipeline, ProcessorConfig
-
+from ..core import Pipeline as PolarsPipeline
+from ..core import ProcessorConfig
 
 logger = logging.getLogger(__name__)
 
 
 class ProcessingMode(Enum):
     """Processing mode selection."""
+
     LOCAL = "local"  # Single machine with Polars
     SPARK = "spark"  # Distributed with PySpark
-    AUTO = "auto"    # Auto-select based on data size
+    AUTO = "auto"  # Auto-select based on data size
 
 
 class DistributedPipeline:
@@ -34,9 +35,9 @@ class DistributedPipeline:
 
     def __init__(
         self,
-        mode: Union[ProcessingMode, str] = ProcessingMode.AUTO,
-        local_config: Optional[ProcessorConfig] = None,
-        spark_config: Optional[SparkConfig] = None,
+        mode: ProcessingMode | str = ProcessingMode.AUTO,
+        local_config: ProcessorConfig | None = None,
+        spark_config: SparkConfig | None = None,
     ):
         """Initialize distributed pipeline.
 
@@ -52,9 +53,9 @@ class DistributedPipeline:
         self.local_config = local_config or ProcessorConfig()
         self.spark_config = spark_config or SparkConfig()
 
-        self._local_pipeline: Optional[PolarsPipeline] = None
-        self._spark_engine: Optional[SparkEngine] = None
-        self._processors: List[Callable] = []
+        self._local_pipeline: PolarsPipeline | None = None
+        self._spark_engine: SparkEngine | None = None
+        self._processors: list[Callable] = []
 
     def _get_local_pipeline(self) -> PolarsPipeline:
         """Get or create local Polars pipeline."""
@@ -67,9 +68,7 @@ class DistributedPipeline:
     def _get_spark_engine(self) -> SparkEngine:
         """Get or create Spark engine."""
         if not SPARK_AVAILABLE:
-            raise ImportError(
-                "PySpark is not available. Install with: pip install pyspark"
-            )
+            raise ImportError("PySpark is not available. Install with: pip install pyspark")
 
         if self._spark_engine is None:
             self._spark_engine = SparkEngine(self.spark_config)
@@ -77,8 +76,8 @@ class DistributedPipeline:
 
     def _select_mode(
         self,
-        file_path: Union[str, Path],
-        file_size_mb: Optional[float] = None,
+        file_path: str | Path,
+        file_size_mb: float | None = None,
     ) -> ProcessingMode:
         """Auto-select processing mode based on data characteristics.
 
@@ -95,7 +94,7 @@ class DistributedPipeline:
         # Calculate file size if not provided
         if file_size_mb is None:
             # Handle S3 paths
-            if isinstance(file_path, str) and file_path.startswith('s3://'):
+            if isinstance(file_path, str) and file_path.startswith("s3://"):
                 # For S3 paths, default to Spark since they're typically large datasets
                 logger.info("S3 path detected, using Spark mode for distributed processing")
                 return ProcessingMode.SPARK if SPARK_AVAILABLE else ProcessingMode.LOCAL
@@ -119,7 +118,7 @@ class DistributedPipeline:
             logger.info(f"Auto-selected local mode (file size: {file_size_mb:.1f} MB)")
         return ProcessingMode.LOCAL
 
-    def add_processor(self, processor: Callable) -> 'DistributedPipeline':
+    def add_processor(self, processor: Callable) -> "DistributedPipeline":
         """Add a processor to the pipeline.
 
         Note: Processor must work with both Polars and Spark DataFrames
@@ -136,10 +135,10 @@ class DistributedPipeline:
 
     def process_file(
         self,
-        input_path: Union[str, Path],
-        output_path: Union[str, Path],
+        input_path: str | Path,
+        output_path: str | Path,
         file_type: str = "parquet",
-        force_mode: Optional[ProcessingMode] = None,
+        force_mode: ProcessingMode | None = None,
     ) -> dict:
         """Process file using appropriate engine.
 
@@ -153,15 +152,15 @@ class DistributedPipeline:
             Processing statistics
         """
         # Don't convert S3 paths to Path objects
-        if isinstance(input_path, str) and input_path.startswith('s3://'):
-            input_path_obj = input_path
+        if isinstance(input_path, str) and input_path.startswith("s3://"):
+            input_path_obj: str | Path = input_path
         else:
-            input_path_obj = Path(input_path)
+            input_path_obj = str(Path(input_path))
 
-        if isinstance(output_path, str) and output_path.startswith('s3://'):
-            output_path_obj = output_path
+        if isinstance(output_path, str) and output_path.startswith("s3://"):
+            output_path_obj: str | Path = output_path
         else:
-            output_path_obj = Path(output_path)
+            output_path_obj = str(Path(output_path))
 
         # Select mode
         selected_mode = force_mode or self._select_mode(input_path_obj)
@@ -173,8 +172,8 @@ class DistributedPipeline:
 
     def _process_with_polars(
         self,
-        input_path: Union[str, Path],
-        output_path: Union[str, Path],
+        input_path: str | Path,
+        output_path: str | Path,
         file_type: str,
     ) -> dict:
         """Process using Polars (local mode).
@@ -187,7 +186,7 @@ class DistributedPipeline:
         Returns:
             Processing stats
         """
-        logger.info(f"Processing with Polars (local mode)")
+        logger.info("Processing with Polars (local mode)")
 
         pipeline = self._get_local_pipeline()
         stats = pipeline.process_file(
@@ -208,8 +207,8 @@ class DistributedPipeline:
 
     def _process_with_spark(
         self,
-        input_path: Union[str, Path],
-        output_path: Union[str, Path],
+        input_path: str | Path,
+        output_path: str | Path,
         file_type: str,
     ) -> dict:
         """Process using Spark (distributed mode).
@@ -222,9 +221,10 @@ class DistributedPipeline:
         Returns:
             Processing stats
         """
-        logger.info(f"Processing with Spark (distributed mode)")
+        logger.info("Processing with Spark (distributed mode)")
 
         import time
+
         start_time = time.time()
 
         engine = self._get_spark_engine()
@@ -238,19 +238,22 @@ class DistributedPipeline:
         input_record_count = None
         if file_type == "parquet":
             try:
-                import pyarrow.parquet as pq
-                from pathlib import Path
+
+                import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
                 input_path_for_pyarrow = str(input_path)
                 if input_path_for_pyarrow.startswith("s3://"):
-                    import s3fs
+                    import s3fs  # type: ignore[import-not-found]
+
                     fs = s3fs.S3FileSystem()
                     parquet_metadata = pq.read_metadata(input_path_for_pyarrow, filesystem=fs)
                     input_record_count = parquet_metadata.num_rows
                 else:
                     parquet_metadata = pq.read_metadata(input_path_for_pyarrow)
                     input_record_count = parquet_metadata.num_rows
-                print(f"✓ Input file contains {input_record_count:,} records (from Parquet metadata)")
+                print(
+                    f"✓ Input file contains {input_record_count:,} records (from Parquet metadata)"
+                )
             except Exception as e:
                 print(f"⚠ Could not read input record count: {e}")
 
@@ -265,7 +268,7 @@ class DistributedPipeline:
             raise ValueError(f"Unsupported file type: {file_type}")
 
         # Apply processors (simplified - in production would convert processors)
-        for processor in self._processors:
+        for _processor in self._processors:
             # Would need adapter to convert Polars processors to Spark UDFs
             pass
 
@@ -275,7 +278,8 @@ class DistributedPipeline:
         # Counting BEFORE any S3 operations ensures executors are fresh and connected.
 
         # Cache the dataframe to avoid recomputation
-        from pyspark import StorageLevel
+        from pyspark import StorageLevel  # type: ignore[import-not-found]
+
         df = df.persist(StorageLevel.MEMORY_AND_DISK)
 
         # For local/Minikube: Use input record count (reliable)

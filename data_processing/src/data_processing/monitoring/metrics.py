@@ -2,17 +2,18 @@
 
 Anthropic-level monitoring: Privacy-first, research-focused, production-grade.
 """
+
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Dict, List, Optional
-import psutil
-from prometheus_client import Counter, Gauge, Histogram, Summary, CollectorRegistry, Info
+
+import psutil  # type: ignore[import-untyped]
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, Info
 
 
 @dataclass
 class ProcessingMetrics:
     """Container for processing metrics."""
+
     records_processed: int = 0
     records_failed: int = 0
     bytes_processed: int = 0
@@ -21,10 +22,10 @@ class ProcessingMetrics:
     cpu_percent: float = 0.0
     memory_mb: float = 0.0
     peak_memory_mb: float = 0.0
-    errors: List[str] = field(default_factory=list)
-    timestamps: Dict[str, float] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    timestamps: dict[str, float] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             "records_processed": self.records_processed,
@@ -54,35 +55,35 @@ class MetricsCollector:
         # PROCESSING METRICS
         # ============================================================
         self.records_processed = Counter(
-            'records_processed_total',
-            'Total number of records processed',
-            ['stage', 'status'],  # Labels: stage=ingestion/processing/output, status=success/failed
+            "records_processed_total",
+            "Total number of records processed",
+            ["stage", "status"],  # Labels: stage=ingestion/processing/output, status=success/failed
             registry=self.registry,
         )
         self.processing_duration = Histogram(
-            'processing_duration_seconds',
-            'Time spent processing data by stage',
-            ['stage'],
+            "processing_duration_seconds",
+            "Time spent processing data by stage",
+            ["stage"],
             buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0],
             registry=self.registry,
         )
         self.batch_size = Histogram(
-            'batch_size_records',
-            'Number of records per batch',
-            ['stage'],
+            "batch_size_records",
+            "Number of records per batch",
+            ["stage"],
             buckets=[10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000],
             registry=self.registry,
         )
         self.pipeline_queue_depth = Gauge(
-            'pipeline_queue_depth',
-            'Number of items waiting in pipeline queue',
-            ['stage'],
+            "pipeline_queue_depth",
+            "Number of items waiting in pipeline queue",
+            ["stage"],
             registry=self.registry,
         )
         self.throughput = Gauge(
-            'throughput_records_per_second',
-            'Processing throughput in records/second',
-            ['stage'],
+            "throughput_records_per_second",
+            "Processing throughput in records/second",
+            ["stage"],
             registry=self.registry,
         )
 
@@ -90,27 +91,27 @@ class MetricsCollector:
         # DATA QUALITY METRICS (Research-focused)
         # ============================================================
         self.data_quality_score = Gauge(
-            'data_quality_score',
-            'Overall data quality score (0-1)',
-            ['dataset'],
+            "data_quality_score",
+            "Overall data quality score (0-1)",
+            ["dataset"],
             registry=self.registry,
         )
         self.schema_validation_failures = Counter(
-            'schema_validation_failures_total',
-            'Number of schema validation failures',
-            ['field', 'error_type'],
+            "schema_validation_failures_total",
+            "Number of schema validation failures",
+            ["field", "error_type"],
             registry=self.registry,
         )
         self.duplicate_records = Counter(
-            'duplicate_records_total',
-            'Number of duplicate records detected',
-            ['dedup_method'],
+            "duplicate_records_total",
+            "Number of duplicate records detected",
+            ["dedup_method"],
             registry=self.registry,
         )
         self.data_freshness = Gauge(
-            'data_freshness_seconds',
-            'Age of the most recently processed data',
-            ['source'],
+            "data_freshness_seconds",
+            "Age of the most recently processed data",
+            ["source"],
             registry=self.registry,
         )
 
@@ -118,33 +119,33 @@ class MetricsCollector:
         # PRIVACY & AUDIT METRICS (Critical for CLIO)
         # ============================================================
         self.pii_entities_detected = Counter(
-            'pii_entities_detected_total',
-            'Number of PII entities detected by type',
-            ['entity_type'],  # email, phone, name, ssn, etc.
+            "pii_entities_detected_total",
+            "Number of PII entities detected by type",
+            ["entity_type"],  # email, phone, name, ssn, etc.
             registry=self.registry,
         )
         self.anonymization_operations = Counter(
-            'anonymization_operations_total',
-            'Number of anonymization operations by method',
-            ['method', 'status'],  # method=hash/mask/redact/synthetic, status=success/failed
+            "anonymization_operations_total",
+            "Number of anonymization operations by method",
+            ["method", "status"],  # method=hash/mask/redact/synthetic, status=success/failed
             registry=self.registry,
         )
         self.audit_log_writes = Counter(
-            'audit_log_writes_total',
-            'Number of audit log entries written',
-            ['operation', 'status'],  # operation=read/write/delete/export
+            "audit_log_writes_total",
+            "Number of audit log entries written",
+            ["operation", "status"],  # operation=read/write/delete/export
             registry=self.registry,
         )
         self.privacy_policy_violations = Counter(
-            'privacy_policy_violations_total',
-            'Number of privacy policy violations detected',
-            ['violation_type'],
+            "privacy_policy_violations_total",
+            "Number of privacy policy violations detected",
+            ["violation_type"],
             registry=self.registry,
         )
         self.encryption_operations = Counter(
-            'encryption_operations_total',
-            'Number of encryption/decryption operations',
-            ['direction', 'status'],  # direction=encrypt/decrypt
+            "encryption_operations_total",
+            "Number of encryption/decryption operations",
+            ["direction", "status"],  # direction=encrypt/decrypt
             registry=self.registry,
         )
 
@@ -152,28 +153,28 @@ class MetricsCollector:
         # STORAGE METRICS (MinIO/S3)
         # ============================================================
         self.storage_operations = Counter(
-            'storage_operations_total',
-            'Number of storage operations',
-            ['operation', 'status'],  # operation=upload/download/delete/list
+            "storage_operations_total",
+            "Number of storage operations",
+            ["operation", "status"],  # operation=upload/download/delete/list
             registry=self.registry,
         )
         self.storage_bytes_transferred = Counter(
-            'storage_bytes_transferred_total',
-            'Total bytes transferred to/from storage',
-            ['direction'],  # upload/download
+            "storage_bytes_transferred_total",
+            "Total bytes transferred to/from storage",
+            ["direction"],  # upload/download
             registry=self.registry,
         )
         self.storage_latency = Histogram(
-            'storage_latency_seconds',
-            'Storage operation latency',
-            ['operation'],
+            "storage_latency_seconds",
+            "Storage operation latency",
+            ["operation"],
             buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0],
             registry=self.registry,
         )
         self.storage_objects_count = Gauge(
-            'storage_objects_total',
-            'Total number of objects in storage',
-            ['bucket'],
+            "storage_objects_total",
+            "Total number of objects in storage",
+            ["bucket"],
             registry=self.registry,
         )
 
@@ -181,25 +182,25 @@ class MetricsCollector:
         # RESOURCE METRICS
         # ============================================================
         self.cpu_usage = Gauge(
-            'cpu_usage_percent',
-            'CPU usage percentage',
+            "cpu_usage_percent",
+            "CPU usage percentage",
             registry=self.registry,
         )
         self.memory_usage = Gauge(
-            'memory_usage_bytes',
-            'Memory usage in bytes',
-            ['type'],  # rss, vms
+            "memory_usage_bytes",
+            "Memory usage in bytes",
+            ["type"],  # rss, vms
             registry=self.registry,
         )
         self.open_file_descriptors = Gauge(
-            'open_file_descriptors',
-            'Number of open file descriptors',
+            "open_file_descriptors",
+            "Number of open file descriptors",
             registry=self.registry,
         )
         self.disk_io_bytes = Counter(
-            'disk_io_bytes_total',
-            'Disk I/O in bytes',
-            ['direction'],  # read/write
+            "disk_io_bytes_total",
+            "Disk I/O in bytes",
+            ["direction"],  # read/write
             registry=self.registry,
         )
 
@@ -207,21 +208,21 @@ class MetricsCollector:
         # API METRICS
         # ============================================================
         self.http_requests = Counter(
-            'http_requests_total',
-            'Total HTTP requests',
-            ['method', 'endpoint', 'status_code'],
+            "http_requests_total",
+            "Total HTTP requests",
+            ["method", "endpoint", "status_code"],
             registry=self.registry,
         )
         self.http_request_duration = Histogram(
-            'http_request_duration_seconds',
-            'HTTP request latency',
-            ['method', 'endpoint'],
+            "http_request_duration_seconds",
+            "HTTP request latency",
+            ["method", "endpoint"],
             buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0],
             registry=self.registry,
         )
         self.http_requests_in_flight = Gauge(
-            'http_requests_in_flight',
-            'Number of HTTP requests currently being processed',
+            "http_requests_in_flight",
+            "Number of HTTP requests currently being processed",
             registry=self.registry,
         )
 
@@ -229,30 +230,34 @@ class MetricsCollector:
         # SYSTEM INFO
         # ============================================================
         self.build_info = Info(
-            'build_info',
-            'Build information',
+            "build_info",
+            "Build information",
             registry=self.registry,
         )
-        import sys
         import platform as platform_module
-        self.build_info.info({
-            'job_name': job_name,
-            'python_version': platform_module.python_version(),
-            'platform': platform_module.system(),
-        })
+
+        self.build_info.info(
+            {
+                "job_name": job_name,
+                "python_version": platform_module.python_version(),
+                "platform": platform_module.system(),
+            }
+        )
 
         # Internal metrics
         self._metrics = ProcessingMetrics()
         self._process = psutil.Process()
-        self._start_time: Optional[float] = None
-        self._stage_timers: Dict[str, float] = {}
+        self._start_time: float | None = None
+        self._stage_timers: dict[str, float] = {}
 
     def start_processing(self) -> None:
         """Mark the start of processing."""
         self._start_time = time.time()
-        self._metrics.timestamps['start'] = self._start_time
+        self._metrics.timestamps["start"] = self._start_time
 
-    def record_processed(self, count: int = 1, bytes_size: int = 0, stage: str = "processing") -> None:
+    def record_processed(
+        self, count: int = 1, bytes_size: int = 0, stage: str = "processing"
+    ) -> None:
         """Record successfully processed records.
 
         Args:
@@ -264,7 +269,9 @@ class MetricsCollector:
         self._metrics.bytes_processed += bytes_size
         self.records_processed.labels(stage=stage, status="success").inc(count)
 
-    def record_failed(self, count: int = 1, error: Optional[str] = None, stage: str = "processing") -> None:
+    def record_failed(
+        self, count: int = 1, error: str | None = None, stage: str = "processing"
+    ) -> None:
         """Record failed records.
 
         Args:
@@ -333,7 +340,9 @@ class MetricsCollector:
     # STORAGE METHODS
     # ============================================================
 
-    def record_storage_operation(self, operation: str, success: bool = True, bytes_transferred: int = 0, latency: float = 0.0) -> None:
+    def record_storage_operation(
+        self, operation: str, success: bool = True, bytes_transferred: int = 0, latency: float = 0.0
+    ) -> None:
         """Record storage operation.
 
         Args:
@@ -405,7 +414,9 @@ class MetricsCollector:
     # API METHODS
     # ============================================================
 
-    def record_http_request(self, method: str, endpoint: str, status_code: int, duration: float) -> None:
+    def record_http_request(
+        self, method: str, endpoint: str, status_code: int, duration: float
+    ) -> None:
         """Record HTTP request.
 
         Args:
@@ -414,7 +425,9 @@ class MetricsCollector:
             status_code: HTTP status code
             duration: Request duration in seconds
         """
-        self.http_requests.labels(method=method, endpoint=endpoint, status_code=str(status_code)).inc()
+        self.http_requests.labels(
+            method=method, endpoint=endpoint, status_code=str(status_code)
+        ).inc()
         self.http_request_duration.labels(method=method, endpoint=endpoint).observe(duration)
 
     def increment_http_in_flight(self) -> None:
@@ -484,7 +497,7 @@ class MetricsCollector:
 
         # File descriptors
         try:
-            num_fds = self._process.num_fds() if hasattr(self._process, 'num_fds') else 0
+            num_fds = self._process.num_fds() if hasattr(self._process, "num_fds") else 0
             if num_fds > 0:
                 self.open_file_descriptors.set(num_fds)
         except (AttributeError, NotImplementedError):
@@ -493,7 +506,9 @@ class MetricsCollector:
 
         # Disk I/O
         try:
-            io_counters = self._process.io_counters() if hasattr(self._process, 'io_counters') else None
+            io_counters = (
+                self._process.io_counters() if hasattr(self._process, "io_counters") else None
+            )
             if io_counters:
                 # Note: These are cumulative counters, not rates
                 self.disk_io_bytes.labels(direction="read").inc(0)  # Initialize
@@ -509,7 +524,7 @@ class MetricsCollector:
             Final processing metrics
         """
         end_time = time.time()
-        self._metrics.timestamps['end'] = end_time
+        self._metrics.timestamps["end"] = end_time
 
         if self._start_time:
             self._metrics.processing_time_seconds = end_time - self._start_time

@@ -3,10 +3,11 @@
 High-performance, privacy-preserving data processing with monitoring,
 analytics, and Mac M4 optimizations.
 """
+
 from .cli.commands import cli
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     cli()
 

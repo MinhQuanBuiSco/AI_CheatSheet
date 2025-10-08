@@ -1,15 +1,17 @@
 """PII detection and anonymization for privacy-preserving data processing."""
+
 import hashlib
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
 from enum import Enum
+from typing import Any
 
 import polars as pl
 
 
 class PIIType(Enum):
     """Types of PII that can be detected."""
+
     EMAIL = "email"
     PHONE = "phone"
     SSN = "ssn"
@@ -24,7 +26,8 @@ class PIIType(Enum):
 @dataclass
 class AnonymizationConfig:
     """Configuration for data anonymization."""
-    enabled_pii_types: Set[PIIType] = field(
+
+    enabled_pii_types: set[PIIType] = field(
         default_factory=lambda: {
             PIIType.EMAIL,
             PIIType.PHONE,
@@ -36,7 +39,7 @@ class AnonymizationConfig:
     anonymization_method: str = "hash"  # hash, redact, mask, synthetic
     hash_salt: str = "anthropic-clio-salt"
     preserve_format: bool = True
-    custom_patterns: Dict[str, str] = field(default_factory=dict)
+    custom_patterns: dict[str, str] = field(default_factory=dict)
 
 
 class PIIDetector:
@@ -44,30 +47,30 @@ class PIIDetector:
 
     # Regex patterns for common PII types
     PATTERNS = {
-        PIIType.EMAIL: r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
-        PIIType.PHONE: r'\b(?:\+?1[-.]?)?\(?([0-9]{3})\)?[-.]?([0-9]{3})[-.]?([0-9]{4})\b',
-        PIIType.SSN: r'\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b',
-        PIIType.CREDIT_CARD: r'\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})\b',
-        PIIType.IP_ADDRESS: r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b',
-        PIIType.DATE_OF_BIRTH: r'\b(?:0[1-9]|1[0-2])[/-](?:0[1-9]|[12][0-9]|3[01])[/-](?:19|20)\d{2}\b',
+        PIIType.EMAIL: r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+        PIIType.PHONE: r"\b(?:\+?1[-.]?)?\(?([0-9]{3})\)?[-.]?([0-9]{3})[-.]?([0-9]{4})\b",
+        PIIType.SSN: r"\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b",
+        PIIType.CREDIT_CARD: r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})\b",
+        PIIType.IP_ADDRESS: r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b",
+        PIIType.DATE_OF_BIRTH: r"\b(?:0[1-9]|1[0-2])[/-](?:0[1-9]|[12][0-9]|3[01])[/-](?:19|20)\d{2}\b",
     }
 
     def __init__(self, config: AnonymizationConfig):
         self.config = config
         self._compiled_patterns = self._compile_patterns()
 
-    def _compile_patterns(self) -> Dict[PIIType, re.Pattern]:
+    def _compile_patterns(self) -> dict[PIIType, re.Pattern]:
         """Compile regex patterns for enabled PII types."""
         patterns = {}
         for pii_type in self.config.enabled_pii_types:
             if pii_type in self.PATTERNS:
                 patterns[pii_type] = re.compile(self.PATTERNS[pii_type])
             elif pii_type == PIIType.CUSTOM:
-                for name, pattern in self.config.custom_patterns.items():
+                for _name, pattern in self.config.custom_patterns.items():
                     patterns[PIIType.CUSTOM] = re.compile(pattern)
         return patterns
 
-    def detect(self, text: str) -> List[tuple[PIIType, str, int, int]]:
+    def detect(self, text: str) -> list[tuple[PIIType, str, int, int]]:
         """Detect PII in text.
 
         Args:
@@ -82,12 +85,14 @@ class PIIDetector:
         findings = []
         for pii_type, pattern in self._compiled_patterns.items():
             for match in pattern.finditer(text):
-                findings.append((
-                    pii_type,
-                    match.group(),
-                    match.start(),
-                    match.end(),
-                ))
+                findings.append(
+                    (
+                        pii_type,
+                        match.group(),
+                        match.start(),
+                        match.end(),
+                    )
+                )
 
         return findings
 
@@ -109,7 +114,7 @@ class Anonymizer:
     def __init__(self, config: AnonymizationConfig):
         self.config = config
         self.detector = PIIDetector(config)
-        self._anonymization_cache: Dict[str, str] = {}
+        self._anonymization_cache: dict[str, str] = {}
 
     def _hash_value(self, value: str) -> str:
         """Hash a value with salt.
@@ -146,18 +151,18 @@ class Anonymizer:
             Masked string
         """
         if pii_type == PIIType.EMAIL:
-            parts = value.split('@')
+            parts = value.split("@")
             if len(parts) == 2:
                 return f"{'*' * len(parts[0])}@{parts[1]}"
         elif pii_type == PIIType.PHONE:
-            return re.sub(r'\d', '*', value[:-4]) + value[-4:]
+            return re.sub(r"\d", "*", value[:-4]) + value[-4:]
         elif pii_type == PIIType.CREDIT_CARD:
-            return '*' * (len(value) - 4) + value[-4:]
+            return "*" * (len(value) - 4) + value[-4:]
 
         # Default: mask all but last 4 characters
         if len(value) > 4:
-            return '*' * (len(value) - 4) + value[-4:]
-        return '*' * len(value)
+            return "*" * (len(value) - 4) + value[-4:]
+        return "*" * len(value)
 
     def anonymize_text(self, text: str) -> tuple[str, int]:
         """Anonymize PII in text.
@@ -201,7 +206,9 @@ class Anonymizer:
 
         return result, num_replacements
 
-    def anonymize_dataframe(self, df: pl.DataFrame, text_columns: Optional[List[str]] = None) -> tuple[pl.DataFrame, Dict[str, int]]:
+    def anonymize_dataframe(
+        self, df: pl.DataFrame, text_columns: list[str] | None = None
+    ) -> tuple[pl.DataFrame, dict[str, int]]:
         """Anonymize PII in DataFrame columns.
 
         Args:
@@ -222,7 +229,7 @@ class Anonymizer:
             total_replacements = 0
 
             # Apply anonymization to each value
-            anonymized_values = []
+            anonymized_values: list[str | None] = []
             for value in result_df[col]:
                 if value is not None:
                     anon_value, num_replacements = self.anonymize_text(str(value))
@@ -231,14 +238,12 @@ class Anonymizer:
                 else:
                     anonymized_values.append(None)
 
-            result_df = result_df.with_columns(
-                pl.Series(col, anonymized_values)
-            )
+            result_df = result_df.with_columns(pl.Series(col, anonymized_values))
             stats[col] = total_replacements
 
         return result_df, stats
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get anonymization cache statistics.
 
         Returns:

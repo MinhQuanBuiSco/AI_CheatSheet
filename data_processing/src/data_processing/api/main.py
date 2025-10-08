@@ -6,46 +6,49 @@ CLIO-focused API for:
 - Distributed computing with Spark
 - Quality checks and monitoring
 """
-import os
-import uuid
-import time
-import logging
-from contextlib import asynccontextmanager
-from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+import logging
+import os
+import time
+import uuid
+from contextlib import asynccontextmanager
+from typing import Any
+
 import polars as pl
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from pydantic import BaseModel, Field
 from starlette.responses import Response
+
+from ..analytics import ClusteringConfig, DataClusterer, DataQualityChecker
+from ..core import Pipeline, ProcessorConfig
+from ..distributed import SPARK_AVAILABLE, DistributedPipeline, ProcessingMode, SparkConfig
+from ..monitoring import MetricsCollector
+from ..privacy import AnonymizationConfig, Anonymizer
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
 
-from ..core import Pipeline, ProcessorConfig
-from ..privacy import Anonymizer, AnonymizationConfig
-from ..analytics import DataQualityChecker, DataClusterer, ClusteringConfig
-from ..monitoring import MetricsCollector
-from ..distributed import DistributedPipeline, ProcessingMode, SparkConfig, SPARK_AVAILABLE
-
 # Get worker ID (process ID or hostname)
-WORKER_ID = os.environ.get('HOSTNAME', f"pid-{os.getpid()}")
+WORKER_ID = os.environ.get("HOSTNAME", f"pid-{os.getpid()}")
 
 
 # Module-level processor for multiprocessing compatibility
 _anonymizer_cache = {}
 
+
 def get_anonymizer() -> Anonymizer:
     """Get or create anonymizer (cached)."""
-    if 'anonymizer' not in _anonymizer_cache:
-        _anonymizer_cache['anonymizer'] = Anonymizer(AnonymizationConfig())
-    return _anonymizer_cache['anonymizer']
+    if "anonymizer" not in _anonymizer_cache:
+        _anonymizer_cache["anonymizer"] = Anonymizer(AnonymizationConfig())
+    return _anonymizer_cache["anonymizer"]
+
 
 def anonymize_processor(df: pl.DataFrame) -> pl.DataFrame:
     """Anonymize PII in dataframe (module-level for pickling)."""
@@ -55,15 +58,15 @@ def anonymize_processor(df: pl.DataFrame) -> pl.DataFrame:
 
 
 # Prometheus metrics
-api_requests = Counter('api_requests_total', 'Total API requests', ['method', 'endpoint'])
-api_duration = Histogram('api_duration_seconds', 'API request duration')
+api_requests = Counter("api_requests_total", "Total API requests", ["method", "endpoint"])
+api_duration = Histogram("api_duration_seconds", "API request duration")
 
 # Initialize comprehensive metrics collector
 metrics_collector = MetricsCollector(job_name="data_processing_api")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     """Lifecycle manager for FastAPI application."""
     # Startup
     print("Starting CLIO-style data processing API...")
@@ -89,19 +92,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Request logging middleware
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
+async def log_requests(request: Request, call_next):  # type: ignore[no-untyped-def]
     """Log all incoming requests with worker ID and timing."""
     request_id = str(uuid.uuid4())[:8]
     start_time = time.time()
 
-    logger.info(f"[Worker {WORKER_ID}] [Request {request_id}] {request.method} {request.url.path} - Started")
+    logger.info(
+        f"[Worker {WORKER_ID}] [Request {request_id}] {request.method} {request.url.path} - Started"
+    )
 
     response = await call_next(request)
 
     duration = time.time() - start_time
-    logger.info(f"[Worker {WORKER_ID}] [Request {request_id}] {request.method} {request.url.path} - Completed in {duration:.3f}s (Status: {response.status_code})")
+    logger.info(
+        f"[Worker {WORKER_ID}] [Request {request_id}] {request.method} {request.url.path} - Completed in {duration:.3f}s (Status: {response.status_code})"
+    )
 
     # Add worker ID to response headers
     response.headers["X-Worker-ID"] = WORKER_ID
@@ -113,6 +121,7 @@ async def log_requests(request: Request, call_next):
 # Request/Response Models
 class ProcessRequest(BaseModel):
     """Request model for data processing with privacy preservation."""
+
     input_path: str = Field(..., description="Path to input data file")
     output_path: str = Field(..., description="Path for output data")
     file_type: str = Field(default="parquet", description="File format")
@@ -124,11 +133,12 @@ class ProcessRequest(BaseModel):
 
 class SparkProcessRequest(BaseModel):
     """Request model for Spark distributed processing."""
+
     input_path: str
     output_path: str
     file_type: str = "parquet"
     mode: str = "auto"  # auto, local, spark
-    spark_master: Optional[str] = "spark://spark-master:7077"  # Use Spark cluster
+    spark_master: str | None = "spark://spark-master:7077"  # Use Spark cluster
     executor_memory: str = "2g"
     driver_memory: str = "1g"
     executor_cores: int = 2
@@ -137,6 +147,7 @@ class SparkProcessRequest(BaseModel):
 
 class ProcessResponse(BaseModel):
     """Response model for data processing."""
+
     job_id: str
     status: str
     message: str
@@ -145,39 +156,46 @@ class ProcessResponse(BaseModel):
 
 class QualityCheckRequest(BaseModel):
     """Request model for quality check."""
+
     file_path: str = Field(..., description="Path to data file")
 
 
 class QualityCheckResponse(BaseModel):
     """Response model for quality check."""
+
     total_records: int
     total_columns: int
     quality_score: float
     issues_count: int
-    issues: List[str]
+    issues: list[str]
 
 
 class ClusterRequest(BaseModel):
     """Request model for clustering."""
+
     input_path: str = Field(..., description="Path to input data")
     text_column: str = Field(default="content", description="Column to cluster by")
     num_clusters: int = Field(default=5, ge=2, le=50, description="Number of clusters")
-    algorithm: str = Field(default="kmeans", description="Clustering algorithm (kmeans, dbscan, hierarchical)")
-    output_path: Optional[str] = Field(default=None, description="Output path for clustered data")
+    algorithm: str = Field(
+        default="kmeans", description="Clustering algorithm (kmeans, dbscan, hierarchical)"
+    )
+    output_path: str | None = Field(default=None, description="Output path for clustered data")
 
 
 class ClusterResponse(BaseModel):
     """Response model for clustering."""
+
     job_id: str
     status: str
     message: str
     num_clusters: int
     worker_id: str
-    output_path: Optional[str] = None
+    output_path: str | None = None
 
 
 class HealthResponse(BaseModel):
     """Health check response."""
+
     status: str
     version: str
     worker_id: str
@@ -185,9 +203,9 @@ class HealthResponse(BaseModel):
 
 # Routes
 @app.get("/", response_model=dict)
-async def root():
+async def root() -> dict[str, Any]:
     """Root endpoint with API information."""
-    api_requests.labels(method='GET', endpoint='/').inc()
+    api_requests.labels(method="GET", endpoint="/").inc()
     return {
         "name": "CLIO Data Processing API",
         "description": "Privacy-preserving research infrastructure",
@@ -199,38 +217,31 @@ async def root():
             "Large-scale clustering",
             "Distributed processing (Spark)",
             "Quality checks",
-            "Monitoring & observability"
-        ]
+            "Monitoring & observability",
+        ],
     }
 
 
 @app.get("/health", response_model=HealthResponse)
-async def health():
+async def health() -> HealthResponse:
     """Health check endpoint."""
-    api_requests.labels(method='GET', endpoint='/health').inc()
-    return HealthResponse(
-        status="healthy",
-        version="0.1.0",
-        worker_id=WORKER_ID
-    )
+    api_requests.labels(method="GET", endpoint="/health").inc()
+    return HealthResponse(status="healthy", version="0.1.0", worker_id=WORKER_ID)
 
 
 @app.get("/ready", response_model=dict)
-async def ready():
+async def ready() -> dict[str, str]:
     """Readiness check endpoint."""
-    api_requests.labels(method='GET', endpoint='/ready').inc()
+    api_requests.labels(method="GET", endpoint="/ready").inc()
 
     # Update resource metrics on readiness check
     metrics_collector.update_resource_metrics()
 
-    return {
-        "status": "ready",
-        "worker_id": WORKER_ID
-    }
+    return {"status": "ready", "worker_id": WORKER_ID}
 
 
 @app.post("/metrics/generate-sample")
-async def generate_sample_metrics():
+async def generate_sample_metrics() -> dict[str, Any]:
     """Generate sample metrics for demo purposes (CLIO-focused)."""
     import random
 
@@ -257,16 +268,10 @@ async def generate_sample_metrics():
 
     # Simulate storage operations
     metrics_collector.record_storage_operation(
-        operation="upload",
-        success=True,
-        bytes_transferred=1024 * 1024 * 50,  # 50MB
-        latency=0.5
+        operation="upload", success=True, bytes_transferred=1024 * 1024 * 50, latency=0.5  # 50MB
     )
     metrics_collector.record_storage_operation(
-        operation="download",
-        success=True,
-        bytes_transferred=1024 * 1024 * 45,
-        latency=0.3
+        operation="download", success=True, bytes_transferred=1024 * 1024 * 45, latency=0.3
     )
 
     # Simulate data quality
@@ -281,31 +286,30 @@ async def generate_sample_metrics():
         "records_processed": 1000,
         "pii_detected": "varied by type",
         "quality_score": 0.95,
-        "note": "Refresh Grafana dashboards to see metrics"
+        "note": "Refresh Grafana dashboards to see metrics",
     }
 
 
 @app.get("/metrics")
-async def metrics():
+async def metrics() -> Response:
     """Prometheus metrics endpoint with comprehensive monitoring."""
-    from prometheus_client import generate_latest, REGISTRY, CollectorRegistry
-    from prometheus_client.registry import Collector
+    from prometheus_client import REGISTRY
 
     # Merge default registry with our custom metrics
     combined_output = generate_latest(REGISTRY)
     custom_output = generate_latest(metrics_collector.registry)
 
     # Combine both outputs (remove duplicate headers)
-    custom_lines = custom_output.decode('utf-8').split('\n')
-    filtered_custom = [line for line in custom_lines if line and not line.startswith('#')]
+    custom_lines = custom_output.decode("utf-8").split("\n")
+    filtered_custom = [line for line in custom_lines if line and not line.startswith("#")]
 
-    combined = combined_output.decode('utf-8') + '\n'.join(filtered_custom)
+    combined = combined_output.decode("utf-8") + "\n".join(filtered_custom)
 
-    return Response(combined.encode('utf-8'), media_type=CONTENT_TYPE_LATEST)
+    return Response(combined.encode("utf-8"), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.post("/process", response_model=ProcessResponse)
-async def process_data(request: ProcessRequest, background_tasks: BackgroundTasks):
+async def process_data(request: ProcessRequest, background_tasks: BackgroundTasks) -> ProcessResponse:
     """Process data with optional PII detection and anonymization.
 
     This endpoint demonstrates CLIO-style privacy-preserving data processing:
@@ -313,7 +317,7 @@ async def process_data(request: ProcessRequest, background_tasks: BackgroundTask
     - Maintains audit trail of data access
     - Processes data efficiently using streaming and multiprocessing
     """
-    api_requests.labels(method='POST', endpoint='/process').inc()
+    api_requests.labels(method="POST", endpoint="/process").inc()
 
     try:
         job_id = str(uuid.uuid4())
@@ -336,11 +340,11 @@ async def process_data(request: ProcessRequest, background_tasks: BackgroundTask
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/quality-check", response_model=QualityCheckResponse)
-async def quality_check(request: QualityCheckRequest):
+async def quality_check(request: QualityCheckRequest) -> QualityCheckResponse:
     """Run comprehensive data quality check.
 
     Validates data quality including:
@@ -350,7 +354,7 @@ async def quality_check(request: QualityCheckRequest):
     - Outlier detection
     - Quality scoring
     """
-    api_requests.labels(method='POST', endpoint='/quality-check').inc()
+    api_requests.labels(method="POST", endpoint="/quality-check").inc()
 
     try:
         # Load data
@@ -368,14 +372,14 @@ async def quality_check(request: QualityCheckRequest):
             issues=report.issues[:10],  # Return first 10 issues
         )
 
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="File not found")
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail="File not found") from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/cluster", response_model=ClusterResponse)
-async def cluster_data(request: ClusterRequest, background_tasks: BackgroundTasks):
+async def cluster_data(request: ClusterRequest, background_tasks: BackgroundTasks) -> ClusterResponse:
     """Cluster data by semantic similarity.
 
     Demonstrates CLIO-style clustering for research:
@@ -383,7 +387,7 @@ async def cluster_data(request: ClusterRequest, background_tasks: BackgroundTask
     - Supports multiple clustering algorithms
     - Scales to large datasets
     """
-    api_requests.labels(method='POST', endpoint='/cluster').inc()
+    api_requests.labels(method="POST", endpoint="/cluster").inc()
 
     try:
         job_id = str(uuid.uuid4())
@@ -404,11 +408,11 @@ async def cluster_data(request: ClusterRequest, background_tasks: BackgroundTask
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/spark/process", response_model=ProcessResponse)
-async def spark_process(request: SparkProcessRequest, background_tasks: BackgroundTasks):
+async def spark_process(request: SparkProcessRequest, background_tasks: BackgroundTasks) -> ProcessResponse:
     """Process data using Spark for distributed computing.
 
     For extremely large datasets that require distributed processing:
@@ -416,12 +420,11 @@ async def spark_process(request: SparkProcessRequest, background_tasks: Backgrou
     - Scales across multiple executors
     - Maintains same privacy guarantees as single-node processing
     """
-    api_requests.labels(method='POST', endpoint='/spark/process').inc()
+    api_requests.labels(method="POST", endpoint="/spark/process").inc()
 
     if not SPARK_AVAILABLE:
         raise HTTPException(
-            status_code=501,
-            detail="Spark is not available. Install with: pip install pyspark"
+            status_code=501, detail="Spark is not available. Install with: pip install pyspark"
         )
 
     try:
@@ -429,7 +432,9 @@ async def spark_process(request: SparkProcessRequest, background_tasks: Backgrou
 
         # Debug: Log the received paths
         logger.info(f"[{WORKER_ID}] Spark Job {job_id} - Received input_path: {request.input_path}")
-        logger.info(f"[{WORKER_ID}] Spark Job {job_id} - Received output_path: {request.output_path}")
+        logger.info(
+            f"[{WORKER_ID}] Spark Job {job_id} - Received output_path: {request.output_path}"
+        )
 
         print(f"[{WORKER_ID}] Spark Job {job_id} assigned to worker {WORKER_ID}")
 
@@ -449,39 +454,36 @@ async def spark_process(request: SparkProcessRequest, background_tasks: Backgrou
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/spark/status")
-async def spark_status():
+async def spark_status() -> dict[str, Any]:
     """Check Spark availability and cluster status."""
-    api_requests.labels(method='GET', endpoint='/spark/status').inc()
+    api_requests.labels(method="GET", endpoint="/spark/status").inc()
 
     if not SPARK_AVAILABLE:
-        return {
-            "available": False,
-            "message": "PySpark is not installed"
-        }
+        return {"available": False, "message": "PySpark is not installed"}
 
     try:
-        from pyspark.sql import SparkSession
+        from pyspark.sql import SparkSession  # type: ignore[import-not-found]
 
         return {
             "available": True,
-            "pyspark_version": SparkSession.__version__ if hasattr(SparkSession, '__version__') else "3.5.0",
+            "pyspark_version": (
+                SparkSession.__version__ if hasattr(SparkSession, "__version__") else "3.5.0"
+            ),
             "master": "spark://spark-master:7077",
-            "message": "Spark is available"
+            "message": "Spark is available",
         }
     except Exception as e:
-        return {
-            "available": False,
-            "error": str(e)
-        }
+        return {"available": False, "error": str(e)}
 
 
 # Background Tasks
 
-async def _process_file(job_id: str, request: ProcessRequest, worker_id: str):
+
+async def _process_file(job_id: str, request: ProcessRequest, worker_id: str) -> None:
     """Background task to process file with privacy preservation."""
     try:
         logger.info(f"[Worker {worker_id}] [Job {job_id}] Starting processing")
@@ -513,18 +515,23 @@ async def _process_file(job_id: str, request: ProcessRequest, worker_id: str):
         )
 
         logger.info(f"[Worker {worker_id}] [Job {job_id}] Completed successfully")
-        logger.info(f"[Worker {worker_id}] [Job {job_id}] Records: {stats.processed_records:,}, Duration: {stats.processing_time:.2f}s, Throughput: {stats.throughput:.0f} rec/s")
+        logger.info(
+            f"[Worker {worker_id}] [Job {job_id}] Records: {stats.processed_records:,}, Duration: {stats.processing_time:.2f}s, Throughput: {stats.throughput:.0f} rec/s"
+        )
 
     except Exception as e:
         logger.error(f"[Worker {worker_id}] [Job {job_id}] Failed: {str(e)}")
         import traceback
+
         traceback.print_exc()
 
 
-async def _cluster_task(job_id: str, request: ClusterRequest):
+async def _cluster_task(job_id: str, request: ClusterRequest) -> None:
     """Background task to cluster data."""
     try:
-        print(f"[Job {job_id}] Clustering data ({request.num_clusters} clusters, {request.algorithm})")
+        print(
+            f"[Job {job_id}] Clustering data ({request.num_clusters} clusters, {request.algorithm})"
+        )
 
         # Load data
         df = pl.read_parquet(request.input_path)
@@ -541,6 +548,7 @@ async def _cluster_task(job_id: str, request: ClusterRequest):
 
         # Save
         from pathlib import Path
+
         output_path = request.output_path or f"/tmp/clustered_{job_id}.parquet"
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         clustered_df.write_parquet(output_path, compression="zstd")
@@ -550,17 +558,20 @@ async def _cluster_task(job_id: str, request: ClusterRequest):
 
         print(f"[Job {job_id}] Clustering complete:")
         for cluster_id, summary in summaries.items():
-            print(f"  Cluster {cluster_id}: {summary['size']} records ({summary['percentage']:.1f}%)")
+            print(
+                f"  Cluster {cluster_id}: {summary['size']} records ({summary['percentage']:.1f}%)"
+            )
 
         print(f"[Job {job_id}] Saved to {output_path}")
 
     except Exception as e:
         print(f"[Job {job_id}] Failed: {str(e)}")
         import traceback
+
         traceback.print_exc()
 
 
-async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_id: str):
+async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_id: str) -> None:
     """Background task to process file with Spark."""
     try:
         logger.info(f"[Worker {worker_id}] [Spark Job {job_id}] Starting distributed processing")
@@ -570,16 +581,17 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
 
         # Create Spark config with S3 credentials from environment
         import os
+
         spark_config = SparkConfig(
             app_name=f"api-job-{job_id}",
-            master=request.spark_master,
+            master=request.spark_master or "local[*]",
             executor_memory=request.executor_memory,
             driver_memory=request.driver_memory,
             executor_cores=request.executor_cores,
             num_executors=request.num_executors,
-            aws_access_key=os.environ.get('AWS_ACCESS_KEY_ID'),
-            aws_secret_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
-            s3_endpoint=os.environ.get('AWS_ENDPOINT_URL'),
+            aws_access_key=os.environ.get("AWS_ACCESS_KEY_ID"),
+            aws_secret_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+            s3_endpoint=os.environ.get("AWS_ENDPOINT_URL"),
         )
 
         # Create distributed pipeline
@@ -603,11 +615,11 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
         print(f"  Throughput: {stats['throughput']:,.0f} rec/s")
 
         # Record metrics for monitoring
-        records_count = stats['records_processed']
+        records_count = stats["records_processed"]
         metrics_collector.record_processed(count=records_count, stage="spark_processing")
         # Record duration using the histogram directly
         metrics_collector.processing_duration.labels(stage="spark_processing").observe(
-            stats['processing_time_seconds']
+            stats["processing_time_seconds"]
         )
 
         # Detect actual PII in the output data
@@ -615,6 +627,7 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
         try:
             # Read a sample of the output file for PII detection
             import polars as pl
+
             from data_processing.privacy import PIIDetector
 
             # Read output file (use Polars for local access or sample from S3)
@@ -626,16 +639,10 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
             output_df = pl.read_parquet(request.output_path)
 
             # Initialize PII detector
-            pii_detector = PIIDetector()
+            pii_detector = PIIDetector(AnonymizationConfig())
 
             # Count PII entities by type across all text columns
-            pii_counts = {
-                "email": 0,
-                "phone": 0,
-                "name": 0,
-                "ssn": 0,
-                "credit_card": 0
-            }
+            pii_counts = {"email": 0, "phone": 0, "name": 0, "ssn": 0, "credit_card": 0}
 
             # Sample up to 100 rows for PII detection (to avoid overwhelming Presidio)
             sample_size = min(100, len(output_df))
@@ -647,8 +654,8 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
                     for text in sample_df[col]:
                         if text is not None:
                             results = pii_detector.detect(str(text))
-                            for result in results:
-                                entity_type = result.entity_type.lower()
+                            for pii_type, _text_match, _start, _end in results:
+                                entity_type = pii_type.value.lower()
                                 if "email" in entity_type:
                                     pii_counts["email"] += 1
                                 elif "phone" in entity_type:
@@ -679,6 +686,7 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
 
             # Fallback to simulated PII metrics
             import random
+
             pii_ratio = 0.12
             total_pii = int(records_count * pii_ratio)
 
@@ -693,7 +701,9 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
         metrics_collector.record_anonymization("hash", count=int(total_pii * 0.4), success=True)
         metrics_collector.record_anonymization("mask", count=int(total_pii * 0.3), success=True)
         metrics_collector.record_anonymization("redact", count=int(total_pii * 0.2), success=True)
-        metrics_collector.record_anonymization("synthetic", count=int(total_pii * 0.1), success=True)
+        metrics_collector.record_anonymization(
+            "synthetic", count=int(total_pii * 0.1), success=True
+        )
 
         # Record audit log writes
         metrics_collector.record_audit_log("data_processing", success=True)
@@ -702,7 +712,9 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
         quality_score = 0.95 + random.random() * 0.04
         metrics_collector.record_quality_score("spark_output", quality_score)
 
-        print(f"[{worker_id}] Recorded metrics: {records_count:,} records, {total_pii:,} PII entities")
+        print(
+            f"[{worker_id}] Recorded metrics: {records_count:,} records, {total_pii:,} PII entities"
+        )
 
         # Cleanup
         pipeline.stop()
@@ -710,6 +722,7 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
     except Exception as e:
         print(f"[{worker_id}] Spark Job {job_id} failed: {str(e)}")
         import traceback
+
         traceback.print_exc()
 
         # Even on failure, record sample metrics for demo purposes
@@ -735,7 +748,9 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
         metrics_collector.record_anonymization("hash", count=int(total_pii * 0.4), success=True)
         metrics_collector.record_anonymization("mask", count=int(total_pii * 0.3), success=True)
         metrics_collector.record_anonymization("redact", count=int(total_pii * 0.2), success=True)
-        metrics_collector.record_anonymization("synthetic", count=int(total_pii * 0.1), success=True)
+        metrics_collector.record_anonymization(
+            "synthetic", count=int(total_pii * 0.1), success=True
+        )
 
         # Record audit log
         metrics_collector.record_audit_log("data_processing", success=False)
@@ -744,9 +759,12 @@ async def _process_file_spark(job_id: str, request: SparkProcessRequest, worker_
         quality_score = 0.95 + random.random() * 0.04
         metrics_collector.record_quality_score("spark_output", quality_score)
 
-        print(f"[{worker_id}] Fallback metrics recorded: {records_count:,} records, {total_pii:,} PII entities")
+        print(
+            f"[{worker_id}] Fallback metrics recorded: {records_count:,} records, {total_pii:,} PII entities"
+        )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

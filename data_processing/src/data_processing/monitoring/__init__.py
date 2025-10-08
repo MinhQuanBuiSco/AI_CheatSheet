@@ -1,6 +1,7 @@
 """Monitoring and observability for data processing."""
+
+from .logging import LogLevel, StructuredLogger
 from .metrics import MetricsCollector, ProcessingMetrics
-from .logging import StructuredLogger, LogLevel
 from .progress import ProgressTracker
 
 __all__ = [

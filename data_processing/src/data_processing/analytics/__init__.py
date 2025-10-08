@@ -1,5 +1,6 @@
 """Advanced analytics for data processing."""
-from .clustering import DataClusterer, ClusteringConfig
+
+from .clustering import ClusteringConfig, DataClusterer
 from .hierarchy import HierarchyBuilder
 from .quality import DataQualityChecker, QualityReport
 

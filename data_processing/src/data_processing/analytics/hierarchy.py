@@ -1,35 +1,36 @@
 """Build hierarchical structures from data."""
-from typing import Dict, List, Optional, Any
+
+from typing import Any, Optional
+
 import polars as pl
-from collections import defaultdict
 
 
 class HierarchyNode:
     """Represents a node in a hierarchy."""
 
-    def __init__(self, id: str, data: Dict[str, Any], parent: Optional['HierarchyNode'] = None):
+    def __init__(self, id: str, data: dict[str, Any], parent: Optional["HierarchyNode"] = None):
         self.id = id
         self.data = data
         self.parent = parent
-        self.children: List[HierarchyNode] = []
-        self.level = 0 if parent is None else parent.level + 1
+        self.children: list[HierarchyNode] = []
+        self.level: int = 0 if parent is None else parent.level + 1
 
-    def add_child(self, child: 'HierarchyNode') -> None:
+    def add_child(self, child: "HierarchyNode") -> None:
         """Add a child node."""
         child.parent = self
         child.level = self.level + 1
         self.children.append(child)
 
-    def get_path(self) -> List[str]:
+    def get_path(self) -> list[str]:
         """Get path from root to this node."""
-        path = []
-        node = self
+        path: list[str] = []
+        node: HierarchyNode | None = self
         while node is not None:
             path.insert(0, node.id)
             node = node.parent
         return path
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "id": self.id,
@@ -42,16 +43,16 @@ class HierarchyNode:
 class HierarchyBuilder:
     """Builds hierarchical structures from flat data."""
 
-    def __init__(self):
-        self.root: Optional[HierarchyNode] = None
-        self._nodes: Dict[str, HierarchyNode] = {}
+    def __init__(self) -> None:
+        self.root: HierarchyNode | None = None
+        self._nodes: dict[str, HierarchyNode] = {}
 
     def build_from_parent_column(
         self,
         df: pl.DataFrame,
         id_column: str,
         parent_column: str,
-        data_columns: Optional[List[str]] = None,
+        data_columns: list[str] | None = None,
     ) -> HierarchyNode:
         """Build hierarchy from parent-child relationships.
 
@@ -111,7 +112,7 @@ class HierarchyBuilder:
         df: pl.DataFrame,
         path_column: str,
         separator: str = "/",
-        data_columns: Optional[List[str]] = None,
+        data_columns: list[str] | None = None,
     ) -> HierarchyNode:
         """Build hierarchy from path strings.
 
@@ -169,11 +170,11 @@ class HierarchyBuilder:
 
         return self.root
 
-    def get_node(self, node_id: str) -> Optional[HierarchyNode]:
+    def get_node(self, node_id: str) -> HierarchyNode | None:
         """Get node by ID."""
         return self._nodes.get(node_id)
 
-    def get_level(self, level: int) -> List[HierarchyNode]:
+    def get_level(self, level: int) -> list[HierarchyNode]:
         """Get all nodes at a specific level."""
         nodes = []
         for node in self._nodes.values():
@@ -187,7 +188,7 @@ class HierarchyBuilder:
             return 0
         return max(node.level for node in self._nodes.values())
 
-    def get_leaf_nodes(self) -> List[HierarchyNode]:
+    def get_leaf_nodes(self) -> list[HierarchyNode]:
         """Get all leaf nodes."""
         return [node for node in self._nodes.values() if not node.children]
 
@@ -203,7 +204,9 @@ class HierarchyBuilder:
                 "id": node.id,
                 "level": node.level,
                 "path": "/".join(node.get_path()[1:]),  # Exclude root
-                "parent_id": node.parent.id if node.parent and node.parent.id != "__root__" else None,
+                "parent_id": (
+                    node.parent.id if node.parent and node.parent.id != "__root__" else None
+                ),
                 "num_children": len(node.children),
                 **node.data,
             }
@@ -211,7 +214,7 @@ class HierarchyBuilder:
 
         return pl.DataFrame(records)
 
-    def print_tree(self, node: Optional[HierarchyNode] = None, indent: int = 0) -> None:
+    def print_tree(self, node: HierarchyNode | None = None, indent: int = 0) -> None:
         """Print tree structure.
 
         Args:
@@ -226,7 +229,9 @@ class HierarchyBuilder:
 
         prefix = "  " * indent
         name = node.data.get("name", node.id)
-        print(f"{prefix}└─ {name} (id={node.id}, level={node.level}, children={len(node.children)})")
+        print(
+            f"{prefix}└─ {name} (id={node.id}, level={node.level}, children={len(node.children)})"
+        )
 
         for child in node.children:
             self.print_tree(child, indent + 1)

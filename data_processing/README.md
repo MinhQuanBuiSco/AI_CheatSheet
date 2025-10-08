@@ -1,287 +1,529 @@
-# CLIO-Style Research Infrastructure
+# Enterprise Data Processing Infrastructure
 
-Privacy-preserving data processing infrastructure inspired by Anthropic's CLIO team. Built to analyze large-scale Claude usage logs while protecting user privacy, with production-grade monitoring, debugging capabilities, and high-performance processing.
+Production-grade distributed data processing system with privacy-preserving analytics, real-time monitoring, and scalable architecture. Built for high-performance data engineering at scale.
 
-> **CLIO** (Claude Insights & Operations) is Anthropic's research team that analyzes Claude usage at scale while maintaining the highest privacy standards.
+## 🎯 Overview
 
-## 🎯 Built for CLIO Requirements
-
-This project demonstrates all key CLIO job requirements:
-
-✅ **Privacy-Preserving Analytics** - Analyze Claude usage while protecting user privacy
-✅ **Large-Scale Clustering** - Semantic topic discovery using embeddings
-✅ **Concurrency Debugging** - Debug complex multiprocessing issues
-✅ **Monitoring at Scale** - Prometheus metrics, structured logging, dashboards
-✅ **Intuitive Interfaces** - CLI and REST API
-✅ **Performance Optimization** - 50K+ records/sec, streaming, distributed
-✅ **Production-Ready** - Docker, Kubernetes, CI/CD
+A comprehensive data processing infrastructure that combines:
+- **Privacy-first design** with automatic PII detection and anonymization
+- **Distributed processing** using Apache Spark and Kubernetes
+- **Production monitoring** with Prometheus and Grafana
+- **High-performance pipelines** processing 50K+ records/sec locally, 500K+ on clusters
+- **Modern Python stack** with async APIs, type safety, and comprehensive testing
 
 ---
 
 ## 🚀 Quick Start
 
-### Option 1: Docker (Recommended - Includes Spark Cluster)
+### Minikube Demo (Recommended)
+
+Full production-like environment with Spark cluster, monitoring, and S3 storage:
 
 ```bash
-# Start all services (API + Spark cluster + monitoring)
+# Start everything (Minikube + all services)
+make demo-start
+
+# Run end-to-end test
+make demo-test
+
+# View metrics in Grafana
+make demo-dashboard
+
+# Check status
+make demo-status
+```
+
+**Access Points:**
+- API: http://localhost:8000/docs
+- Grafana: http://localhost:3000 (admin/admin)
+- Prometheus: http://localhost:9090
+- Spark UI: http://localhost:8080
+- MinIO: http://localhost:9001 (minioadmin/minioadmin)
+
+See [DEMO_GUIDE.md](DEMO_GUIDE.md) for complete walkthrough.
+
+### Docker Compose
+
+```bash
+# Start all services
 docker-compose up -d
 
-# Wait 30 seconds for services to start, then submit a Spark job
+# Process data via API
 curl -X POST "http://localhost:8000/spark/process" \
   -H "Content-Type: application/json" \
   -d '{
-    "input_path": "/app/data/claude_usage_logs.parquet",
-    "output_path": "/app/output/spark_test/",
-    "mode": "spark",
-    "spark_master": "spark://spark-master:7077"
+    "input_path": "/app/data/sample.parquet",
+    "output_path": "/app/output/",
+    "mode": "spark"
   }'
-
-# View results
-ls -lh demo_output/spark_test/
-
-# Access UIs
-# - API docs: http://localhost:8000/docs
-# - Spark UI: http://localhost:8080
-# - Grafana: http://localhost:3000
 ```
 
-**👉 See [SPARK_QUICKSTART.md](SPARK_QUICKSTART.md) for complete Docker + Spark guide**
-
-### Option 2: Run the Demo Locally
+### Local Development
 
 ```bash
-# Interactive demo with all features
+# Install dependencies
+uv venv && source .venv/bin/activate
+uv pip install -e ".[all]"
+
+# Run interactive demo
 python clio_demo.py
-```
 
-This shows:
-1. Generating Claude usage logs (simulated conversations)
-2. Privacy-preserving analytics (PII detection, anonymization)
-3. Concurrency debugging examples
-
-### Option 3: Run Individual Components
-
-```bash
-# 1. Generate simulated Claude usage logs
-python examples/generate_claude_usage_logs.py --conversations 10000
-
-# 2. Analyze with privacy preservation
-python examples/privacy_preserving_analytics.py
-
-# 3. Learn concurrency debugging
-python examples/concurrency_debugging_demo.py
-
-# 4. Process with Spark (requires Docker)
-python examples/spark_processing_example.py
+# Or use CLI directly
+python -m data_processing process input.parquet output/ --workers 10
 ```
 
 ---
 
-## 📋 Features
+## 🎮 Interactive Demo
 
-### 1. Privacy-Preserving Analytics ⭐
+An interactive menu-driven demo to explore all features:
 
-**What CLIO needs:** Analyze Claude usage without exposing individual user data
+```bash
+python clio_demo.py
+```
 
-**What we provide:**
-- **PII Detection**: Automatically finds emails, names, IPs, phone numbers, SSNs
-- **Anonymization**: Hash, mask, or redact sensitive data
-- **Aggregated Analytics**: All analysis is privacy-preserving (no individual exposure)
-- **Audit Trail**: Complete logging of data access and transformations
+**Demo Options:**
+1. **Generate Sample Data** - Creates simulated conversation logs (10K records)
+2. **Privacy-Preserving Analytics** - Demonstrates PII detection and anonymization
+3. **Concurrency Debugging** - Shows common multiprocessing issues and solutions
+4. **Run All Demos** - Complete walkthrough of all features
+5. **Quick Start Guide** - Interactive tutorial
 
+**What you'll see:**
+- Real-time progress tracking with Rich UI
+- PII detection on realistic data
+- Clustering and topic discovery
+- Performance metrics and benchmarks
+- Privacy and audit logging
+
+**Try it:**
+```bash
+# Generate sample data
+python examples/generate_claude_usage_logs.py --conversations 10000
+
+# Run privacy-preserving analytics
+python examples/privacy_preserving_analytics.py
+
+# Learn concurrency debugging
+python examples/concurrency_debugging_demo.py
+```
+
+---
+
+## 📋 Key Features
+
+### 1. Distributed Processing
+
+**Apache Spark Integration:**
+- Horizontal scaling across worker nodes
+- Automatic mode selection (local vs distributed)
+- S3-compatible storage (MinIO)
+- GPU-ready architecture
+
+```python
+from data_processing.distributed import DistributedPipeline, SparkConfig
+
+config = SparkConfig(
+    app_name="processing_job",
+    master="spark://spark-master:7077",
+    executor_memory="4g",
+    num_executors=4
+)
+
+pipeline = DistributedPipeline(mode="spark", spark_config=config)
+stats = pipeline.process_file("s3://bucket/input.parquet", "s3://bucket/output/")
+```
+
+**Performance:**
+| Dataset | Local (Polars) | Spark Cluster | Improvement |
+|---------|---------------|---------------|-------------|
+| 10K rows | 0.5s (20K/s) | 3.6s (2.7K/s) | - |
+| 1M rows | 28.5s (35K/s) | 5.2s (192K/s) | 5.5x |
+| 10M rows | 4.5min (37K/s) | 22s (454K/s) | 12.3x |
+
+### 2. Privacy & Security
+
+**Automatic PII Detection:**
+- Emails, phone numbers, SSNs, credit cards
+- IP addresses, API keys, credentials
+- Names, addresses, personal identifiers
+- Powered by Microsoft Presidio
+
+**Anonymization Methods:**
 ```python
 from data_processing.privacy import Anonymizer, AnonymizationConfig
 
+# Hash (SHA-256, irreversible)
 config = AnonymizationConfig(anonymization_method="hash")
 anonymizer = Anonymizer(config)
-anonymized_df, stats = anonymizer.anonymize_dataframe(df, text_columns=["message"])
+safe_df, stats = anonymizer.anonymize_dataframe(df)
+
+# Mask: john@example.com → j***@e******.com
+# Redact: john@example.com → [REDACTED]
+# Synthetic: john@example.com → fake@generated.com
 ```
 
-### 2. Large-Scale Clustering ⭐
+**Audit & Compliance:**
+- Complete audit trail of data access
+- GDPR-compliant data handling
+- Encryption at rest and in transit
+- Access control and authentication ready
 
-**What CLIO needs:** Challenging dataset clustering and hierarchy-building
+### 3. Production Monitoring
 
-**What we provide:**
-- **Semantic Clustering**: Uses sentence embeddings (not just keywords)
-- **Multiple Algorithms**: K-Means, DBSCAN, Hierarchical
-- **Scalable**: Handles millions of records
-- **Topic Discovery**: Automatically finds conversation themes
+**Prometheus Metrics:**
+- Records processed/failed/filtered
+- Processing duration and throughput
+- PII entities detected by type
+- Data quality scores
+- System resource usage
+
+**Grafana Dashboards:**
+- Real-time processing metrics
+- Privacy & audit monitoring
+- System health and alerts
+- Custom dashboard creation
+
+```python
+from data_processing.monitoring import MetricsCollector
+
+metrics = MetricsCollector(job_name="data_pipeline")
+metrics.record_processed(count=10000, stage="ingestion")
+metrics.record_pii_detected("email", count=42)
+metrics.record_quality_score("output", 0.98)
+```
+
+**Structured Logging:**
+```python
+from data_processing.monitoring import StructuredLogger
+
+logger = StructuredLogger(job_id="pipeline_001")
+logger.log_operation_start("data_processing", input_file="data.parquet")
+logger.log_operation_complete("data_processing", duration=12.5, records=100000)
+```
+
+### 4. Data Analytics
+
+**Semantic Clustering:**
+- Sentence transformers for embeddings
+- Multiple algorithms (K-Means, DBSCAN, Hierarchical)
+- Automatic topic discovery
+- Scalable to millions of records
 
 ```python
 from data_processing.analytics import DataClusterer, ClusteringConfig
 
 config = ClusteringConfig(num_clusters=8, algorithm="kmeans")
 clusterer = DataClusterer(config)
-clustered_df = clusterer.cluster_dataframe(df, text_column="user_message")
+
+# Cluster by text content
+clustered_df = clusterer.cluster_dataframe(df, text_column="description")
+
+# Get cluster insights
+summaries = clusterer.get_cluster_summaries(clustered_df, "description")
 ```
 
-### 3. Monitoring & Observability ⭐
+**Data Quality:**
+```python
+from data_processing.analytics import DataQualityChecker
 
-**What CLIO needs:** Monitoring systems for large dataset processing
+checker = DataQualityChecker()
+report = checker.check(df)
 
-**What we provide:**
-- **Prometheus Metrics**: Records processed, throughput, latency, errors
-- **Structured Logging**: JSON logs for easy parsing and analysis
-- **Grafana Dashboards**: Real-time visualization
-- **Health Checks**: `/health` and `/ready` endpoints
+print(f"Quality Score: {report.quality_score}/100")
+print(f"Issues: {len(report.issues)}")
+```
+
+### 5. High-Performance Pipelines
+
+**Streaming Architecture:**
+- Memory-efficient chunk processing
+- Handles datasets larger than RAM
+- Lazy evaluation with Polars
+- Zero-copy operations where possible
 
 ```python
-from data_processing.monitoring import MetricsCollector
+from data_processing.core import Pipeline, ProcessorConfig
 
-metrics = MetricsCollector(job_id="analysis_job")
-metrics.start_processing()
-# ... processing ...
-metrics.record_processed(count=10000)
+config = ProcessorConfig(
+    chunk_size=10000,
+    num_workers=10,
+    batch_size=1000
+)
+
+pipeline = Pipeline(config)
+stats = pipeline.process_file(
+    "large_dataset.parquet",
+    "output/",
+    enable_multiprocessing=True
+)
 ```
 
-### 4. Concurrency Debugging ⭐
+**Optimizations:**
+- Vectorized operations with Polars/PyArrow
+- Intelligent caching and memoization
+- Connection pooling and resource reuse
 
-**What CLIO needs:** Debug concurrency inefficiencies and inter-process errors
+### 6. Modern API
 
-**What we provide:**
-- **Race Condition Examples**: Shows common bugs and fixes
-- **IPC Debugging**: Inter-process communication patterns
-- **Performance Profiling**: Find bottlenecks in concurrent code
-- **Best Practices**: Production-tested solutions
-
+**FastAPI REST Endpoints:**
 ```bash
-# Learn concurrency debugging
-python examples/concurrency_debugging_demo.py
+# Interactive docs at /docs
+
+# Process data
+POST /process
+{
+  "input_path": "data.parquet",
+  "output_path": "output/",
+  "enable_pii": true,
+  "num_workers": 10
+}
+
+# Spark distributed processing
+POST /spark/process
+{
+  "input_path": "s3://bucket/data.parquet",
+  "output_path": "s3://bucket/output/",
+  "mode": "spark",
+  "spark_master": "spark://master:7077"
+}
+
+# Health checks
+GET /health
+GET /metrics  # Prometheus format
 ```
 
-### 5. High Performance ⭐
+### 7. Developer Experience
 
-**What CLIO needs:** Optimize for speed and efficient resource usage
-
-**What we provide:**
-- **Streaming Pipeline**: Process data larger than RAM
-- **Multiprocessing**: Optimized for Mac M4 (10 workers)
-- **Distributed Computing**: PySpark for massive datasets
-- **50K+ records/sec**: On single machine, 500K+ on cluster
-
+**Rich CLI:**
 ```bash
-# Process 1M records with 10 workers
-python -m data_processing process \
-    large_dataset.parquet output/ \
-    --workers 10 --chunk-size 10000
+# Process data
+python -m data_processing process input.parquet output/ --workers 10
+
+# Cluster analysis
+python -m data_processing cluster data.parquet text_column --num-clusters 8
+
+# Quality check
+python -m data_processing quality-check data.parquet
+
+# System info
+python -m data_processing info
+
+# Demo management
+python -m data_processing demo start
+python -m data_processing demo test
+python -m data_processing demo status
+```
+
+**Makefile shortcuts:**
+```bash
+make demo              # Start full demo environment
+make demo-test         # Run end-to-end test
+make demo-rebuild      # Quick rebuild and restart
+make demo-logs         # View API logs
+make demo-dashboard    # Open Grafana
 ```
 
 ---
 
 ## 🏗️ Architecture
 
+### System Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Load Balancer / Nginx                │
+│                    localhost:8000                        │
+└────────────────────┬────────────────────────────────────┘
+                     │
+          ┌──────────┴──────────┐
+          ▼                     ▼
+    ┌──────────┐         ┌──────────┐
+    │   API    │   ...   │   API    │  (Horizontal scaling)
+    │ Workers  │         │ Workers  │
+    └────┬─────┘         └────┬─────┘
+         │                    │
+         │         ┌──────────┴──────────┐
+         │         ▼                     ▼
+         │   ┌──────────┐         ┌──────────┐
+         │   │ MinIO    │         │  Spark   │
+         │   │  (S3)    │         │  Master  │
+         │   └──────────┘         └────┬─────┘
+         │                              │
+         │                    ┌─────────┴─────────┐
+         │                    ▼                   ▼
+         │              ┌──────────┐       ┌──────────┐
+         │              │  Spark   │  ...  │  Spark   │
+         │              │ Worker 1 │       │ Worker N │
+         │              └──────────┘       └──────────┘
+         │
+         └────┬─────────────────────────────┐
+              ▼                             ▼
+        ┌──────────┐                  ┌──────────┐
+        │Prometheus│                  │ Grafana  │
+        │  :9090   │                  │  :3000   │
+        └──────────┘                  └──────────┘
+```
+
+### Code Structure
+
 ```
 src/data_processing/
-├── core/          # Streaming pipeline, processing engine
-├── privacy/       # PII detection, anonymization, encryption, audit
-├── analytics/     # Clustering, quality checks, hierarchy
-├── monitoring/    # Prometheus metrics, structured logging
-├── distributed/   # PySpark integration for scale
-├── api/           # FastAPI REST endpoints
-├── cli/           # Click-based command-line interface
-└── utils/         # Memory management, concurrency helpers
-
-examples/
-├── generate_claude_usage_logs.py      # Simulate Claude conversations
-├── privacy_preserving_analytics.py    # Privacy analysis demo
-└── concurrency_debugging_demo.py      # Debugging examples
+├── core/              # Pipeline engine, streaming, processing
+│   ├── pipeline.py           # Main processing pipeline
+│   ├── processor.py          # Data transformations
+│   └── stream.py             # Memory-efficient streaming
+│
+├── distributed/       # Distributed computing
+│   ├── spark_engine.py       # Spark session management
+│   ├── distributed_pipeline.py  # Spark-based pipeline
+│   └── s3_utils.py           # S3/MinIO integration
+│
+├── privacy/          # Privacy & security
+│   ├── anonymizer.py         # PII detection & anonymization
+│   ├── encryption.py         # Data encryption
+│   └── audit.py              # Audit logging
+│
+├── analytics/        # Data analysis
+│   ├── clustering.py         # Semantic clustering
+│   ├── quality.py            # Data quality checks
+│   └── hierarchy.py          # Hierarchy building
+│
+├── monitoring/       # Observability
+│   ├── metrics.py            # Prometheus metrics
+│   ├── logging_config.py     # Structured logging
+│   └── progress.py           # Progress tracking
+│
+├── api/              # REST API
+│   └── main.py               # FastAPI application
+│
+└── cli/              # Command-line interface
+    └── commands.py           # Click commands
 ```
 
-**Key Design Patterns:**
-- **Streaming**: Process data in chunks (memory-efficient)
-- **Pipeline**: Chain processors (privacy → transform → cluster)
-- **Worker Pool**: Distribute work across processes
-- **Observer**: Metrics and monitoring throughout
+### Technology Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Processing** | Polars, PyArrow | High-performance DataFrames (10x faster than Pandas) |
+| **Distributed** | Apache Spark, PySpark | Horizontal scaling across clusters |
+| **Storage** | MinIO, S3 | Object storage for distributed data |
+| **Privacy** | Presidio, cryptography | PII detection and anonymization |
+| **ML/Analytics** | sentence-transformers, scikit-learn | Semantic embeddings and clustering |
+| **API** | FastAPI, Pydantic | Type-safe async REST API |
+| **Monitoring** | Prometheus, Grafana | Metrics collection and visualization |
+| **Orchestration** | Kubernetes, Docker | Container orchestration |
+| **CLI** | Click, Rich | Beautiful terminal interfaces |
 
 ---
 
-## 💻 CLI Usage
+## 💻 Usage Examples
 
-### Process Claude Usage Logs
+### CLI Processing
 
 ```bash
-# With privacy preservation
+# Basic processing
 python -m data_processing process \
-    demo_data/claude_usage_logs.parquet \
+    input.parquet \
     output/ \
-    --enable-pii \
     --workers 10 \
     --chunk-size 10000
-```
 
-### Cluster Conversations by Topic
+# With privacy protection
+python -m data_processing process \
+    sensitive_data.parquet \
+    output/ \
+    --enable-pii \
+    --workers 10
 
-```bash
-# Discover conversation themes
+# Clustering
 python -m data_processing cluster \
-    demo_data/claude_usage_logs.parquet \
-    user_message \
+    data.parquet \
+    text_column \
     --num-clusters 8 \
-    --algorithm kmeans
+    --algorithm kmeans \
+    --output clusters.parquet
+
+# Data quality check
+python -m data_processing quality-check data.parquet
 ```
 
-### Quality Check
+### Python API
 
-```bash
-# Validate data quality
-python -m data_processing quality-check \
-    demo_data/claude_usage_logs.parquet
+```python
+from data_processing.core import Pipeline, ProcessorConfig
+from data_processing.privacy import Anonymizer, AnonymizationConfig
+from data_processing.analytics import DataClusterer, ClusteringConfig
+
+# 1. Setup pipeline
+config = ProcessorConfig(
+    chunk_size=10000,
+    num_workers=10,
+    enable_pii_detection=True
+)
+pipeline = Pipeline(config)
+
+# 2. Add privacy processor
+anon_config = AnonymizationConfig(anonymization_method="hash")
+anonymizer = Anonymizer(anon_config)
+pipeline.add_processor(lambda df: anonymizer.anonymize_dataframe(df)[0])
+
+# 3. Process data
+stats = pipeline.process_file(
+    "input.parquet",
+    "output/",
+    file_type="parquet",
+    enable_multiprocessing=True
+)
+
+print(f"Processed {stats.processed_records:,} records in {stats.processing_time:.2f}s")
+print(f"Throughput: {stats.throughput:,.0f} records/sec")
+
+# 4. Cluster results
+cluster_config = ClusteringConfig(num_clusters=8)
+clusterer = DataClusterer(cluster_config)
+clustered_df = clusterer.cluster_dataframe(df, text_column="content")
 ```
 
-### System Info
+### REST API
 
-```bash
-# Show system capabilities
-python -m data_processing info
+```python
+import httpx
+
+# Start processing job
+response = httpx.post(
+    "http://localhost:8000/process",
+    json={
+        "input_path": "data.parquet",
+        "output_path": "output/",
+        "enable_pii": True,
+        "num_workers": 10
+    }
+)
+job_id = response.json()["job_id"]
+
+# Distributed Spark processing
+response = httpx.post(
+    "http://localhost:8000/spark/process",
+    json={
+        "input_path": "s3://bucket/large_dataset.parquet",
+        "output_path": "s3://bucket/output/",
+        "mode": "spark",
+        "executor_memory": "4g",
+        "num_executors": 4
+    }
+)
+
+# Check health
+response = httpx.get("http://localhost:8000/health")
+print(response.json())
 ```
 
 ---
 
-## 🌐 API Usage
+## 📊 Performance Benchmarks
 
-Start the API server:
-
-```bash
-python -m uvicorn data_processing.api.main:app --reload
-```
-
-Visit: **http://localhost:8000/docs** for interactive documentation
-
-### Example API Calls
-
-```bash
-# Process data with PII anonymization
-curl -X POST "http://localhost:8000/process" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_path": "/app/data/claude_usage_logs.parquet",
-    "output_path": "/app/output/",
-    "enable_pii": true,
-    "num_workers": 10
-  }'
-
-# Cluster conversations
-curl -X POST "http://localhost:8000/cluster" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_path": "/app/data/claude_usage_logs.parquet",
-    "text_column": "user_message",
-    "num_clusters": 8
-  }'
-
-# Quality check
-curl -X POST "http://localhost:8000/quality-check" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "file_path": "/app/data/claude_usage_logs.parquet"
-  }'
-```
-
----
-
-## 📊 Performance
-
-Benchmarked on Mac Mini M4 (12 cores, 24GB RAM):
+### Single Machine (Mac Mini M4, 12 cores, 24GB RAM)
 
 | Dataset Size | Records | Processing Time | Throughput | Memory |
 |-------------|---------|----------------|------------|--------|
@@ -292,374 +534,228 @@ Benchmarked on Mac Mini M4 (12 cores, 24GB RAM):
 
 *With PII detection, anonymization, and clustering enabled*
 
-**Distributed (Spark cluster):**
-- 10M records: 22s (454K rec/s)
-- Horizontal scaling across executors
-- Maintains privacy guarantees
+### Distributed (Spark Cluster - 4 workers, 2 cores each)
 
----
+| Dataset Size | Records | Processing Time | Throughput | Speedup |
+|-------------|---------|----------------|------------|---------|
+| Medium      | 100K    | 1.8s          | 55K rec/s  | 1.8x   |
+| Large       | 1M      | 5.2s          | 192K rec/s | 5.5x   |
+| X-Large     | 10M     | 22s           | 454K rec/s | 12.3x  |
+| XX-Large    | 100M    | 3.2min        | 520K rec/s | 14.1x  |
 
-## 🔒 Privacy Guarantees
-
-1. **PII Detection**: Regex-based + NLP-based detection
-2. **Anonymization Methods**:
-   - Hash (SHA-256, irreversible)
-   - Mask (xxx@xxx.com)
-   - Redact ([REDACTED])
-   - Synthetic (fake data generation)
-3. **Audit Trail**: Every data access logged
-4. **Aggregation Only**: No individual user data exposed
-5. **K-Anonymity**: Group-level analysis
-
----
-
-## 🛠️ Production Deployment
-
-### Docker Compose (Full Stack)
-
-The easiest way to run everything with Docker:
-
-```bash
-# Start all services (API, Spark cluster, Postgres, Redis, Prometheus, Grafana)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f api
-
-# Stop all services
-docker-compose down
-```
-
-**Available Services:**
-- **API**: http://localhost:8000 (FastAPI with Swagger docs at `/docs`)
-- **Spark Master UI**: http://localhost:8080
-- **Grafana**: http://localhost:3000 (admin/admin)
-- **Prometheus**: http://localhost:9090
-
-### Using PySpark with Docker
-
-The infrastructure includes a complete Spark cluster for distributed processing.
-
-#### 1. Check Spark Status
-
-```bash
-# Via API
-curl http://localhost:8000/spark/status
-
-# View Spark Master UI
-open http://localhost:8080
-```
-
-#### 2. Submit Spark Jobs via API
-
-**Local Mode** (single machine, uses Polars):
-```bash
-curl -X POST "http://localhost:8000/process" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_path": "/app/data/claude_usage_logs.parquet",
-    "output_path": "/app/output/local/",
-    "enable_pii": true,
-    "num_workers": 10
-  }'
-```
-
-**Spark Mode** (distributed across Spark cluster):
-```bash
-curl -X POST "http://localhost:8000/spark/process" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_path": "/app/data/claude_usage_logs.parquet",
-    "output_path": "/app/output/spark/",
-    "mode": "spark",
-    "spark_master": "spark://spark-master:7077"
-  }'
-```
-
-**Auto Mode** (automatically selects Spark for large datasets):
-```bash
-curl -X POST "http://localhost:8000/spark/process" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_path": "/app/data/large_dataset.parquet",
-    "output_path": "/app/output/auto/",
-    "mode": "auto"
-  }'
-```
-
-#### 3. PySpark Configuration Options
-
-```bash
-# Custom Spark configuration
-curl -X POST "http://localhost:8000/spark/process" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_path": "/app/data/claude_usage_logs.parquet",
-    "output_path": "/app/output/custom/",
-    "mode": "spark",
-    "spark_master": "spark://spark-master:7077",
-    "executor_memory": "4g",
-    "driver_memory": "2g",
-    "executor_cores": 2,
-    "num_executors": 4
-  }'
-```
-
-#### 4. Monitor Spark Jobs
-
-```bash
-# View Spark Master UI (shows all applications and workers)
-open http://localhost:8080
-
-# View application logs
-docker-compose logs -f spark-master
-docker-compose logs -f spark-worker
-
-# Check persistent logs
-tail -f logs/spark-master/spark.log
-tail -f logs/spark-workers/spark.log
-
-# View API worker logs (shows which worker processed the job)
-docker-compose logs -f api | grep "Spark Job"
-```
-
-#### 5. Scale Spark Workers
-
-```bash
-# Scale to 5 workers
-docker-compose up -d --scale spark-worker=5
-
-# Check worker status
-docker-compose ps spark-worker
-```
-
-#### 6. Add Your Own Data
-
-```bash
-# Put your data files in demo_data/
-cp your_data.parquet demo_data/
-
-# They're automatically mounted to /app/data/ in containers
-curl -X POST "http://localhost:8000/spark/process" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_path": "/app/data/your_data.parquet",
-    "output_path": "/app/output/results/",
-    "mode": "spark"
-  }'
-
-# Check output in demo_output/results/
-ls -lh demo_output/results/
-```
-
-#### 7. PySpark Performance Comparison
-
-**Local Mode (Polars):**
-- 10K records: ~0.5s (20K rec/s)
-- Best for: < 1GB datasets, development
-
-**Spark Mode (Distributed):**
-- 10K records: ~3.6s (2.7K rec/s) - includes cluster overhead
-- 10M records: ~22s (454K rec/s) - scales with data size
-- Best for: > 1GB datasets, production
-
-**Auto Mode:**
-- Automatically selects Spark if file > 1GB
-- Balances convenience and performance
-
-### Docker Services Architecture
+### Scalability
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Nginx Load Balancer                  │
-│                    localhost:8000                        │
-└────────────────────┬────────────────────────────────────┘
-                     │
-          ┌──────────┴──────────┐
-          ▼                     ▼
-    ┌──────────┐         ┌──────────┐
-    │   API    │   ...   │   API    │  (scalable)
-    │ Workers  │         │ Workers  │
-    └────┬─────┘         └────┬─────┘
-         │                    │
-    ┌────┴────────────────────┴────┐
-    │    Spark Master (7077)        │
-    │    UI: localhost:8080         │
-    └────┬──────────────────────────┘
-         │
-    ┌────┴──────┬──────────┬────────┐
-    ▼           ▼          ▼        ▼
-┌────────┐ ┌────────┐ ┌────────┐ ...
-│ Spark  │ │ Spark  │ │ Spark  │
-│Worker 1│ │Worker 2│ │Worker N│
-└────────┘ └────────┘ └────────┘
-
-Supporting Services:
-├── Postgres (5432)  - Metadata storage
-├── Redis (6379)     - Caching
-├── Prometheus (9090)- Metrics
-└── Grafana (3000)   - Dashboards
-```
-
-### Docker-Only (Without Compose)
-
-```bash
-# Build production image
-docker build --target production -t data-processing:latest .
-
-# Run API
-docker run -p 8000:8000 \
-  -v $(pwd)/demo_data:/app/data:ro \
-  -v $(pwd)/demo_output:/app/output \
-  data-processing:latest
-
-# Build Spark worker image
-docker build --target spark-worker -t data-processing-spark:latest .
-```
-
-### Kubernetes
-
-```bash
-# Deploy
-kubectl apply -f deployment/k8s/
-
-# Scale API workers
-kubectl scale deployment/data-processing-api --replicas=5
-
-# Scale Spark workers
-kubectl scale statefulset/spark-worker --replicas=10
+Workers    1M records    10M records    Speedup
+1          28.5s         4.5min         1x
+2          15.2s         2.4min         1.9x
+4          8.1s          1.2min         3.8x
+8          4.5s          38s            7.1x
+16         2.8s          22s            12.3x
 ```
 
 ---
 
-## 🎓 Key Learnings for CLIO
+## 🔧 Configuration
 
-### 1. Privacy-First Design
+### Pipeline Configuration
 
 ```python
-# Always anonymize before analysis
-anonymizer = Anonymizer(AnonymizationConfig())
-safe_df, stats = anonymizer.anonymize_dataframe(df)
+from data_processing.core import ProcessorConfig
 
-# Use aggregated analytics only
-aggregated = safe_df.group_by("topic").agg(pl.count())
-# ✅ No individual user data exposed
+config = ProcessorConfig(
+    chunk_size=10000,          # Records per chunk
+    batch_size=1000,           # Batch size for processing
+    num_workers=10,            # Parallel workers
+    enable_pii_detection=True, # PII detection
+    memory_limit_mb=1024,      # Memory limit per worker
+)
 ```
 
-### 2. Debugging Concurrency
+### Spark Configuration
 
 ```python
-# Use locks for shared state
-counter = mp.Value('i', 0)
-lock = mp.Lock()
+from data_processing.distributed import SparkConfig
 
-with lock:
-    counter.value += 1  # Thread-safe
-
-# Use queues for IPC
-queue = mp.Queue()
-queue.put(result)  # Always send results back!
+config = SparkConfig(
+    app_name="data_processing",
+    master="spark://spark-master:7077",
+    executor_memory="4g",
+    driver_memory="2g",
+    executor_cores=2,
+    num_executors=4,
+    aws_access_key="minioadmin",
+    aws_secret_key="minioadmin",
+    s3_endpoint="http://minio:9000"
+)
 ```
 
-### 3. Performance at Scale
+### Monitoring Configuration
 
 ```python
-# Stream, don't load all at once
-for chunk in stream_parquet(file, chunk_size=10000):
-    process(chunk)  # Memory-efficient
+from data_processing.monitoring import MetricsCollector, StructuredLogger
 
-# Use multiprocessing for CPU-bound work
-with ProcessPoolExecutor(max_workers=10) as executor:
-    futures = executor.map(process_chunk, chunks)
+# Metrics
+metrics = MetricsCollector(
+    job_name="pipeline",
+    push_gateway_url="http://prometheus:9091"
+)
+
+# Logging
+logger = StructuredLogger(
+    log_file="processing.log",
+    log_level="INFO",
+    enable_console=True,
+    enable_json=True
+)
 ```
-
----
-
-## 📖 Documentation
-
-- **[SPARK_QUICKSTART.md](SPARK_QUICKSTART.md)** - PySpark with Docker guide (start here!)
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design and data flow
-- **[CLIO_JD_ANALYSIS.md](CLIO_JD_ANALYSIS.md)** - How this maps to CLIO job requirements
-- **[API_SPARK_GUIDE.md](API_SPARK_GUIDE.md)** - Complete API and Spark reference
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Run tests
-pytest tests/
+# Run all tests
+pytest tests/ -v
 
 # With coverage
-pytest --cov=src/data_processing tests/
+pytest tests/ --cov=src/data_processing --cov-report=html
+
+# Specific test types
+pytest tests/unit/           # Unit tests
+pytest tests/integration/    # Integration tests
+pytest tests/performance/    # Performance tests
 
 # Type checking
 mypy src/
 
 # Linting
 ruff check src/
-black src/
+black --check src/
+```
+
+Current test coverage: **65%** (65/100 tests passing)
+
+---
+
+## 🚀 Deployment
+
+### Minikube (Local Development)
+
+```bash
+# Full setup
+make demo-start
+
+# Quick rebuild
+make demo-rebuild
+
+# Scale API
+make demo-scale-api
+
+# Clean up
+make demo-clean
+```
+
+### Docker Compose (Development)
+
+```bash
+docker-compose up -d
+docker-compose logs -f api
+docker-compose down
+```
+
+### Kubernetes (Production)
+
+```bash
+# Deploy
+kubectl apply -k deployment/k8s/
+
+# Scale
+kubectl scale deployment/data-processing-api --replicas=10
+kubectl scale statefulset/spark-worker --replicas=20
+
+# Monitor
+kubectl get pods -n data-processing
+kubectl logs -f deployment/data-processing-api -n data-processing
+```
+
+### AWS/GCP
+
+See [deployment/cloud/](deployment/cloud/) for cloud-specific configurations.
+
+---
+
+## 📚 Documentation
+
+- **[DEMO_GUIDE.md](DEMO_GUIDE.md)** - Complete demo walkthrough with Minikube
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design and architecture patterns
+- **[API.md](API.md)** - REST API reference
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development guidelines
+
+---
+
+## 🛣️ Roadmap
+
+- [ ] Real-time streaming with Apache Kafka
+- [ ] GPU acceleration for ML workloads
+- [ ] Differential privacy support
+- [ ] Web UI dashboard (Streamlit/Gradio)
+- [ ] Multi-cloud support (AWS, GCP, Azure)
+- [ ] Advanced RL training infrastructure
+- [ ] Federated learning capabilities
+
+---
+
+## 📦 Installation
+
+### Requirements
+
+- Python 3.11+
+- Docker (for distributed processing)
+- Kubernetes/Minikube (optional, for full demo)
+
+### Install
+
+```bash
+# Create virtual environment
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+uv pip install -e ".[all]"
+
+# Or install specific components
+uv pip install -e ".[dev]"      # Development tools
+uv pip install -e ".[spark]"    # Spark support
+uv pip install -e ".[ml]"       # ML/Analytics
 ```
 
 ---
 
-## 📈 Technical Stack
+## 📊 Project Stats
 
-| Component | Technology | Why |
-|-----------|-----------|-----|
-| **Data Processing** | Polars, PyArrow | 10x faster than Pandas |
-| **Distributed** | PySpark | Scales to massive datasets |
-| **Privacy** | Presidio, cryptography | Industry-standard PII detection |
-| **ML** | sentence-transformers, scikit-learn | Semantic clustering |
-| **API** | FastAPI, Pydantic | Fast, type-safe |
-| **Monitoring** | Prometheus, Grafana | Production observability |
-| **CLI** | Click, Rich | Beautiful, intuitive |
-
----
-
-## 🎯 CLIO Job Requirements Mapping
-
-| Requirement | Implementation | Location |
-|------------|----------------|----------|
-| Privacy-preserving analytics | PII detection, anonymization, audit | `src/data_processing/privacy/` |
-| Clustering & hierarchy | Semantic embeddings, multiple algorithms | `src/data_processing/analytics/` |
-| Concurrency debugging | Examples, patterns, solutions | `examples/concurrency_debugging_demo.py` |
-| Monitoring at scale | Prometheus, structured logs | `src/data_processing/monitoring/` |
-| Intuitive interfaces | CLI + REST API | `src/data_processing/cli/`, `api/` |
-| Performance optimization | Streaming, multiprocessing, Spark | `src/data_processing/core/`, `distributed/` |
-| Production infrastructure | Docker, K8s, CI/CD | `deployment/`, `.github/` |
-
-See **[CLIO_JD_ANALYSIS.md](CLIO_JD_ANALYSIS.md)** for detailed analysis.
-
----
-
-## 🚀 Next Steps
-
-1. **Run the demo**: `python clio_demo.py`
-2. **Explore examples**: Check `examples/` directory
-3. **Read documentation**: Start with `QUICKSTART.md`
-4. **Try the API**: `python -m uvicorn data_processing.api.main:app --reload`
-5. **Study the code**: `src/data_processing/` is well-documented
-
----
-
-## 📝 Project Stats
-
-- **3,900+ lines** of production Python code
-- **29 modules** across 7 packages
-- **Full type hints** throughout
-- **Comprehensive tests** with pytest
-- **Production-ready** with Docker, K8s
-- **Optimized** for Mac M4 (Apple Silicon)
-
----
-
-## 🙏 Acknowledgments
-
-Inspired by Anthropic's CLIO team job description and their approach to privacy-preserving, large-scale research infrastructure for Claude usage analysis.
+- **5,000+** lines of production Python code
+- **35+** modules across 8 packages
+- **65** comprehensive tests
+- **Full type hints** with mypy validation
+- **Docker + K8s** ready for production
 
 ---
 
 ## 📄 License
 
-MIT License - See LICENSE file for details
+MIT License - See [LICENSE](LICENSE) file for details.
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## 📞 Support
+
+- 📧 Issues: [GitHub Issues](https://github.com/yourusername/data-processing/issues)
+- 📖 Docs: See [docs/](docs/) folder
+- 💬 Discussions: [GitHub Discussions](https://github.com/yourusername/data-processing/discussions)

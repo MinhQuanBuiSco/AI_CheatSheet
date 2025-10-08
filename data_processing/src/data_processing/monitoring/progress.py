@@ -1,16 +1,17 @@
 """Progress tracking for long-running operations."""
+
 import time
-from typing import Optional
+
 from rich.console import Console
 from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
     Progress,
     SpinnerColumn,
-    BarColumn,
-    TextColumn,
-    TimeRemainingColumn,
-    TimeElapsedColumn,
-    MofNCompleteColumn,
     TaskID,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
 )
 from rich.table import Table
 
@@ -21,9 +22,9 @@ class ProgressTracker:
     def __init__(self, enable_rich: bool = True):
         self.enable_rich = enable_rich
         self.console = Console() if enable_rich else None
-        self.progress: Optional[Progress] = None
+        self.progress: Progress | None = None
         self._tasks: dict[str, TaskID] = {}
-        self._start_time: Optional[float] = None
+        self._start_time: float | None = None
 
     def start(self) -> None:
         """Start progress tracking."""
@@ -49,7 +50,7 @@ class ProgressTracker:
         name: str,
         description: str,
         total: int,
-    ) -> Optional[TaskID]:
+    ) -> TaskID | None:
         """Add a new task to track.
 
         Args:
@@ -72,7 +73,7 @@ class ProgressTracker:
         self,
         name: str,
         advance: int = 1,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> None:
         """Update task progress.
 
@@ -86,10 +87,10 @@ class ProgressTracker:
 
         task_id = self._tasks.get(name)
         if task_id is not None:
-            kwargs = {"advance": advance}
             if description:
-                kwargs["description"] = description
-            self.progress.update(task_id, **kwargs)
+                self.progress.update(task_id, advance=advance, description=description)
+            else:
+                self.progress.update(task_id, advance=advance)
 
     def finish(self) -> None:
         """Finish progress tracking and display summary."""
@@ -99,7 +100,7 @@ class ProgressTracker:
         self.progress.stop()
 
         # Display summary
-        if self._start_time:
+        if self._start_time and self.console:
             elapsed = time.time() - self._start_time
             self.console.print(f"\n[bold green]✓[/bold green] Completed in {elapsed:.2f}s")
 
@@ -128,7 +129,8 @@ class ProgressTracker:
                 value_str = str(value)
             table.add_row(key, value_str)
 
-        self.console.print(table)
+        if self.console:
+            self.console.print(table)
 
     def print_info(self, message: str) -> None:
         """Print an info message.

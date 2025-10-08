@@ -1,18 +1,25 @@
 """PySpark engine for distributed processing."""
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, List, Optional, Any
+
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pyspark.conf import SparkConf  # type: ignore[import-not-found]
+    from pyspark.sql import DataFrame as SparkDataFrame  # type: ignore[import-not-found]
+    from pyspark.sql import SparkSession  # type: ignore[import-not-found]
 
 try:
-    from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
-    from pyspark.sql import functions as F
-    from pyspark.conf import SparkConf
+    from pyspark.conf import SparkConf  # type: ignore[import-not-found]
+    from pyspark.sql import DataFrame as SparkDataFrame  # type: ignore[import-not-found]
+    from pyspark.sql import SparkSession  # type: ignore[import-not-found]
+
     SPARK_AVAILABLE = True
 except ImportError:
     SPARK_AVAILABLE = False
-    SparkSession = Any
-    SparkDataFrame = Any
+    SparkSession = Any  # type: ignore[misc,assignment]
+    SparkDataFrame = Any  # type: ignore[misc,assignment]
 
 
 logger = logging.getLogger(__name__)
@@ -21,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SparkConfig:
     """Configuration for Spark engine."""
+
     app_name: str = "anthropic-data-processing"
     master: str = "local[*]"  # local[*], spark://host:port, yarn, k8s://https://...
     executor_memory: str = "4g"
@@ -31,13 +39,13 @@ class SparkConfig:
     dynamic_allocation: bool = True
     adaptive_query_execution: bool = True
     # S3 configuration
-    aws_access_key: Optional[str] = None
-    aws_secret_key: Optional[str] = None
-    s3_endpoint: Optional[str] = None
+    aws_access_key: str | None = None
+    aws_secret_key: str | None = None
+    s3_endpoint: str | None = None
     # Additional Spark configs
-    extra_configs: Dict[str, str] = None
+    extra_configs: dict[str, str] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.extra_configs is None:
             self.extra_configs = {}
 
@@ -47,12 +55,10 @@ class SparkEngine:
 
     def __init__(self, config: SparkConfig):
         if not SPARK_AVAILABLE:
-            raise ImportError(
-                "PySpark is not installed. Install with: pip install pyspark"
-            )
+            raise ImportError("PySpark is not installed. Install with: pip install pyspark")
 
         self.config = config
-        self._spark: Optional[SparkSession] = None
+        self._spark: SparkSession | None = None
 
     def get_session(self) -> SparkSession:
         """Get or create Spark session.
@@ -65,7 +71,7 @@ class SparkEngine:
             if self._spark is not None:
                 try:
                     self._spark.stop()
-                except:
+                except Exception:
                     pass
             self._spark = self._create_session()
         return self._spark
@@ -78,12 +84,12 @@ class SparkEngine:
             if existing:
                 try:
                     # Test if it's actually alive
-                    existing.sparkContext.defaultParallelism
-                except:
+                    _ = existing.sparkContext.defaultParallelism
+                except Exception:
                     # Session is stopped, clear it
                     existing.stop()
                     logger.info("Stopped existing inactive Spark session")
-        except:
+        except Exception:
             pass
 
         import os
@@ -100,7 +106,7 @@ class SparkEngine:
 
         # Driver networking for Kubernetes - use pod IP so executors can reach driver
         # Get pod IP from environment (set by Kubernetes downward API) or hostname resolution
-        driver_host = os.environ.get('POD_IP') or socket.gethostbyname(socket.gethostname())
+        driver_host = os.environ.get("POD_IP") or socket.gethostbyname(socket.gethostname())
         conf.set("spark.driver.host", driver_host)
         conf.set("spark.driver.bindAddress", "0.0.0.0")
         logger.info(f"Spark driver host: {driver_host}")
@@ -116,7 +122,10 @@ class SparkEngine:
             conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
 
         # S3 configuration with local hadoop-aws JARs (pre-downloaded in Docker image)
-        conf.set("spark.jars", "/app/jars/hadoop-aws-3.3.4.jar,/app/jars/aws-java-sdk-bundle-1.12.262.jar")
+        conf.set(
+            "spark.jars",
+            "/app/jars/hadoop-aws-3.3.4.jar,/app/jars/aws-java-sdk-bundle-1.12.262.jar",
+        )
 
         if self.config.aws_access_key:
             conf.set("spark.hadoop.fs.s3a.access.key", self.config.aws_access_key)
@@ -135,8 +144,12 @@ class SparkEngine:
 
         # Network timeouts (increased from defaults to handle pod networking delays)
         conf.set("spark.network.timeout", "600s")  # Default: 120s - Increased for unstable networks
-        conf.set("spark.executor.heartbeatInterval", "30s")  # Default: 10s - More frequent heartbeats
-        conf.set("spark.executor.heartbeat.maxFailures", "10")  # Default: 60 - Allow more failures before killing
+        conf.set(
+            "spark.executor.heartbeatInterval", "30s"
+        )  # Default: 10s - More frequent heartbeats
+        conf.set(
+            "spark.executor.heartbeat.maxFailures", "10"
+        )  # Default: 60 - Allow more failures before killing
 
         # RPC timeouts
         conf.set("spark.rpc.askTimeout", "600s")  # Default: spark.network.timeout
@@ -208,7 +221,7 @@ class SparkEngine:
         spark = self.get_session()
         return spark.read.parquet(path)
 
-    def read_csv(self, path: str, **options) -> SparkDataFrame:
+    def read_csv(self, path: str, **options: Any) -> SparkDataFrame:
         """Read CSV file(s).
 
         Args:
@@ -238,7 +251,7 @@ class SparkEngine:
         df: SparkDataFrame,
         path: str,
         mode: str = "overwrite",
-        partition_by: Optional[List[str]] = None,
+        partition_by: list[str] | None = None,
         compression: str = "snappy",
     ) -> None:
         """Write DataFrame to Parquet.
@@ -262,7 +275,7 @@ class SparkEngine:
         self,
         df: SparkDataFrame,
         batch_size: int,
-        process_func: callable,
+        process_func: Callable[[SparkDataFrame], SparkDataFrame],
     ) -> SparkDataFrame:
         """Process DataFrame in batches using UDF.
 
@@ -278,7 +291,9 @@ class SparkEngine:
         # mapPartitions or pandas UDFs for efficiency
         return df.transform(process_func)
 
-    def optimize_shuffle(self, df: SparkDataFrame, num_partitions: Optional[int] = None) -> SparkDataFrame:
+    def optimize_shuffle(
+        self, df: SparkDataFrame, num_partitions: int | None = None
+    ) -> SparkDataFrame:
         """Optimize DataFrame partitioning.
 
         Args:
@@ -317,7 +332,7 @@ class SparkEngine:
         """
         df.unpersist()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get Spark session statistics.
 
         Returns:

@@ -6,10 +6,11 @@ This module provides common test fixtures for:
 - Mock services
 - Test configuration
 """
+
 import tempfile
-from pathlib import Path
-from typing import Generator
 import uuid
+from collections.abc import Generator
+from pathlib import Path
 
 import polars as pl
 import pytest
@@ -40,47 +41,53 @@ def test_data_dir(tmp_path_factory):
 @pytest.fixture
 def sample_dataframe() -> pl.DataFrame:
     """Create a small sample DataFrame for testing."""
-    return pl.DataFrame({
-        "id": list(range(100)),
-        "timestamp": pl.datetime_range(
-            start=pl.datetime(2024, 1, 1),
-            end=pl.datetime(2024, 1, 1, 1, 39),
-            interval="1m",
-            eager=True
-        ),
-        "value": list(range(100, 200)),
-        "category": ["A", "B", "C"] * 33 + ["A"],
-        "text": [f"Sample text {i}" for i in range(100)],
-    })
+    return pl.DataFrame(
+        {
+            "id": list(range(100)),
+            "timestamp": pl.datetime_range(
+                start=pl.datetime(2024, 1, 1),
+                end=pl.datetime(2024, 1, 1, 1, 39),
+                interval="1m",
+                eager=True,
+            ),
+            "value": list(range(100, 200)),
+            "category": ["A", "B", "C"] * 33 + ["A"],
+            "text": [f"Sample text {i}" for i in range(100)],
+        }
+    )
 
 
 @pytest.fixture
 def large_dataframe() -> pl.DataFrame:
     """Create a larger DataFrame for performance testing."""
     size = 10000
-    return pl.DataFrame({
-        "id": list(range(size)),
-        "value": [i * 2 for i in range(size)],
-        "text": [f"Text {i}" for i in range(size)],
-    })
+    return pl.DataFrame(
+        {
+            "id": list(range(size)),
+            "value": [i * 2 for i in range(size)],
+            "text": [f"Text {i}" for i in range(size)],
+        }
+    )
 
 
 @pytest.fixture
 def pii_dataframe(faker_instance: Faker) -> pl.DataFrame:
     """Create DataFrame with PII for privacy testing."""
     size = 50
-    return pl.DataFrame({
-        "id": list(range(size)),
-        "name": [faker_instance.name() for _ in range(size)],
-        "email": [faker_instance.email() for _ in range(size)],
-        "phone": [faker_instance.phone_number() for _ in range(size)],
-        "ssn": [faker_instance.ssn() for _ in range(size)],
-        "address": [faker_instance.address().replace("\n", ", ") for _ in range(size)],
-        "message": [
-            f"Hi, I'm {faker_instance.name()}. Email me at {faker_instance.email()}"
-            for _ in range(size)
-        ],
-    })
+    return pl.DataFrame(
+        {
+            "id": list(range(size)),
+            "name": [faker_instance.name() for _ in range(size)],
+            "email": [faker_instance.email() for _ in range(size)],
+            "phone": [faker_instance.phone_number() for _ in range(size)],
+            "ssn": [faker_instance.ssn() for _ in range(size)],
+            "address": [faker_instance.address().replace("\n", ", ") for _ in range(size)],
+            "message": [
+                f"Hi, I'm {faker_instance.name()}. Email me at {faker_instance.email()}"
+                for _ in range(size)
+            ],
+        }
+    )
 
 
 @pytest.fixture

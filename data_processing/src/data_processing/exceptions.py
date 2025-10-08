@@ -2,7 +2,8 @@
 
 Anthropic-level error handling: explicit, actionable, context-rich.
 """
-from typing import Optional, Dict, Any
+
+from typing import Any
 
 
 class DataProcessingError(Exception):
@@ -16,8 +17,8 @@ class DataProcessingError(Exception):
         self,
         message: str,
         *,
-        error_code: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        error_code: str | None = None,
+        context: dict[str, Any] | None = None,
         recoverable: bool = False,
     ):
         """Initialize error with rich context.
@@ -34,7 +35,7 @@ class DataProcessingError(Exception):
         self.context = context or {}
         self.recoverable = recoverable
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for structured logging."""
         return {
             "error_type": self.__class__.__name__,
@@ -47,8 +48,10 @@ class DataProcessingError(Exception):
 
 # === Storage Errors ===
 
+
 class StorageError(DataProcessingError):
     """Base class for storage-related errors."""
+
     pass
 
 
@@ -102,8 +105,10 @@ class S3ConnectionError(StorageError):
 
 # === Processing Errors ===
 
+
 class ProcessingError(DataProcessingError):
     """Base class for data processing errors."""
+
     pass
 
 
@@ -134,7 +139,7 @@ class DataValidationError(ProcessingError):
 class ProcessorError(ProcessingError):
     """Error in data processor."""
 
-    def __init__(self, processor_name: str, reason: str, record_index: Optional[int] = None):
+    def __init__(self, processor_name: str, reason: str, record_index: int | None = None):
         super().__init__(
             f"Processor '{processor_name}' failed: {reason}",
             error_code="PROCESSING_003",
@@ -145,15 +150,17 @@ class ProcessorError(ProcessingError):
 
 # === Privacy Errors ===
 
+
 class PrivacyError(DataProcessingError):
     """Base class for privacy-related errors."""
+
     pass
 
 
 class PIIDetectionError(PrivacyError):
     """Error detecting PII in data."""
 
-    def __init__(self, reason: str, text_snippet: Optional[str] = None):
+    def __init__(self, reason: str, text_snippet: str | None = None):
         super().__init__(
             f"PII detection failed: {reason}",
             error_code="PRIVACY_001",
@@ -165,7 +172,7 @@ class PIIDetectionError(PrivacyError):
 class AnonymizationError(PrivacyError):
     """Error anonymizing data."""
 
-    def __init__(self, method: str, reason: str, entity_type: Optional[str] = None):
+    def __init__(self, method: str, reason: str, entity_type: str | None = None):
         super().__init__(
             f"Anonymization failed using method '{method}': {reason}",
             error_code="PRIVACY_002",
@@ -200,8 +207,10 @@ class AuditLogError(PrivacyError):
 
 # === Distributed Computing Errors ===
 
+
 class DistributedError(DataProcessingError):
     """Base class for distributed computing errors."""
+
     pass
 
 
@@ -248,15 +257,21 @@ class SparkResourceError(DistributedError):
         super().__init__(
             f"Insufficient {resource_type}: requested {requested}, available {available}",
             error_code="SPARK_004",
-            context={"resource_type": resource_type, "requested": requested, "available": available},
+            context={
+                "resource_type": resource_type,
+                "requested": requested,
+                "available": available,
+            },
             recoverable=True,
         )
 
 
 # === Configuration Errors ===
 
+
 class ConfigurationError(DataProcessingError):
     """Base class for configuration errors."""
+
     pass
 
 
@@ -267,7 +282,11 @@ class InvalidConfigError(ConfigurationError):
         super().__init__(
             f"Invalid configuration for '{param_name}': {reason}",
             error_code="CONFIG_001",
-            context={"param_name": param_name, "reason": reason, "value": str(value) if value else None},
+            context={
+                "param_name": param_name,
+                "reason": reason,
+                "value": str(value) if value else None,
+            },
             recoverable=False,
         )
 
@@ -275,9 +294,10 @@ class InvalidConfigError(ConfigurationError):
 class MissingConfigError(ConfigurationError):
     """Required configuration is missing."""
 
-    def __init__(self, param_name: str, context_info: Optional[str] = None):
+    def __init__(self, param_name: str, context_info: str | None = None):
         super().__init__(
-            f"Missing required configuration: {param_name}" + (f" ({context_info})" if context_info else ""),
+            f"Missing required configuration: {param_name}"
+            + (f" ({context_info})" if context_info else ""),
             error_code="CONFIG_002",
             context={"param_name": param_name, "context_info": context_info},
             recoverable=False,
@@ -286,8 +306,10 @@ class MissingConfigError(ConfigurationError):
 
 # === Resource Errors ===
 
+
 class ResourceError(DataProcessingError):
     """Base class for resource-related errors."""
+
     pass
 
 
@@ -298,7 +320,11 @@ class OutOfMemoryError(ResourceError):
         super().__init__(
             f"Out of memory during {operation}: required {required_mb}MB, available {available_mb}MB",
             error_code="RESOURCE_001",
-            context={"operation": operation, "required_mb": required_mb, "available_mb": available_mb},
+            context={
+                "operation": operation,
+                "required_mb": required_mb,
+                "available_mb": available_mb,
+            },
             recoverable=False,
         )
 
@@ -317,15 +343,17 @@ class TimeoutError(ResourceError):
 
 # === API Errors ===
 
+
 class APIError(DataProcessingError):
     """Base class for API errors."""
+
     pass
 
 
 class InvalidRequestError(APIError):
     """API request is invalid."""
 
-    def __init__(self, reason: str, field: Optional[str] = None):
+    def __init__(self, reason: str, field: str | None = None):
         super().__init__(
             f"Invalid request: {reason}",
             error_code="API_001",

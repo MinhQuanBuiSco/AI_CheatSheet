@@ -1,14 +1,17 @@
 """Integration tests for API health and basic endpoints."""
-import pytest
-from fastapi.testclient import TestClient
 
 # Import the FastAPI app - adjust path if needed
 import sys
 from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 try:
     from data_processing.api.main import app
+
     client = TestClient(app)
     API_AVAILABLE = True
 except Exception as e:
@@ -28,7 +31,7 @@ class TestHealthEndpoint:
         """Test health endpoint response format."""
         response = client.get("/health")
         data = response.json()
-        
+
         assert "status" in data
         assert data["status"] == "healthy"
 
@@ -45,7 +48,7 @@ class TestMetricsEndpoint:
         """Test metrics endpoint returns Prometheus format."""
         response = client.get("/metrics")
         content = response.text
-        
+
         # Check for Prometheus metric format indicators
         assert "# HELP" in content or "# TYPE" in content or "_total" in content
 

@@ -1,27 +1,26 @@
 """Efficient storage handlers for large-scale data processing."""
+
 import hashlib
 from pathlib import Path
-from typing import Any, Optional, Union
-import polars as pl
-import pyarrow as pa
-import pyarrow.parquet as pq
-import orjson
+from typing import Any
+
 import blake3
+import orjson
+import polars as pl
+import pyarrow as pa  # type: ignore[import-untyped]
+import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
 
 class StorageHandler:
     """Handles efficient data storage with compression and checksums."""
 
-    def __init__(self, base_path: Union[str, Path], enable_compression: bool = True):
+    def __init__(self, base_path: str | Path, enable_compression: bool = True):
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
         self.enable_compression = enable_compression
 
     def write_parquet(
-        self,
-        data: Union[pl.DataFrame, pa.Table],
-        filename: str,
-        compression: str = "zstd"
+        self, data: pl.DataFrame | pa.Table, filename: str, compression: str = "zstd"
     ) -> Path:
         """Write data to Parquet format with compression.
 
@@ -38,7 +37,7 @@ class StorageHandler:
         if isinstance(data, pl.DataFrame):
             data.write_parquet(
                 output_path,
-                compression=compression if self.enable_compression else "uncompressed",
+                compression=compression if self.enable_compression else "uncompressed",  # type: ignore[arg-type]
                 statistics=True,
                 use_pyarrow=True,
             )
@@ -53,7 +52,7 @@ class StorageHandler:
 
         return output_path
 
-    def read_parquet(self, filename: str, use_polars: bool = True) -> Union[pl.DataFrame, pa.Table]:
+    def read_parquet(self, filename: str, use_polars: bool = True) -> pl.DataFrame | pa.Table:
         """Read Parquet file.
 
         Args:
@@ -82,7 +81,7 @@ class StorageHandler:
         """
         output_path = self.base_path / filename
 
-        with open(output_path, 'wb') as f:
+        with open(output_path, "wb") as f:
             f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
 
         return output_path
@@ -98,10 +97,10 @@ class StorageHandler:
         """
         file_path = self.base_path / filename
 
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             return orjson.loads(f.read())
 
-    def compute_checksum(self, filepath: Union[str, Path], algorithm: str = "blake3") -> str:
+    def compute_checksum(self, filepath: str | Path, algorithm: str = "blake3") -> str:
         """Compute file checksum.
 
         Args:
@@ -114,14 +113,14 @@ class StorageHandler:
         filepath = Path(filepath)
 
         if algorithm == "blake3":
-            hasher = blake3.blake3()
+            hasher = blake3.blake3()  # type: ignore[assignment]
         elif algorithm == "sha256":
-            hasher = hashlib.sha256()
+            hasher = hashlib.sha256()  # type: ignore[assignment]
         else:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
 
-        with open(filepath, 'rb') as f:
-            for chunk in iter(lambda: f.read(8192), b''):
+        with open(filepath, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
                 hasher.update(chunk)
 
         return hasher.hexdigest()
@@ -155,7 +154,7 @@ class ChunkWriter:
         if self.current_records >= self.max_records_per_file:
             self.flush()
 
-    def flush(self) -> Optional[Path]:
+    def flush(self) -> Path | None:
         """Flush buffer to disk.
 
         Returns:

@@ -6,19 +6,20 @@ Features:
 - Contextual fields (job_id, worker_id, etc.)
 - Integration with monitoring/metrics
 """
+
+import json
 import logging
 import sys
 import uuid
+from collections.abc import MutableMapping
 from contextvars import ContextVar
 from datetime import datetime
-from typing import Any, Dict, Optional
-import json
-
+from typing import Any
 
 # Context variables for request tracing
-correlation_id_var: ContextVar[Optional[str]] = ContextVar("correlation_id", default=None)
-job_id_var: ContextVar[Optional[str]] = ContextVar("job_id", default=None)
-worker_id_var: ContextVar[Optional[str]] = ContextVar("worker_id", default=None)
+correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+job_id_var: ContextVar[str | None] = ContextVar("job_id", default=None)
+worker_id_var: ContextVar[str | None] = ContextVar("worker_id", default=None)
 
 
 class StructuredFormatter(logging.Formatter):
@@ -47,8 +48,9 @@ class StructuredFormatter(logging.Formatter):
 
         # Add exception info if present
         if record.exc_info:
+            exc_type = record.exc_info[0]
             log_data["exception"] = {
-                "type": record.exc_info[0].__name__,
+                "type": exc_type.__name__ if exc_type else "Unknown",
                 "message": str(record.exc_info[1]),
                 "traceback": self.formatException(record.exc_info),
             }
@@ -135,6 +137,7 @@ def setup_logging(
     handler = logging.StreamHandler(sys.stdout)
 
     # Set formatter
+    formatter: logging.Formatter
     if format_type == "json":
         formatter = StructuredFormatter()
     else:
@@ -161,7 +164,7 @@ def get_logger(name: str) -> logging.Logger:
 class LoggerAdapter(logging.LoggerAdapter):
     """Logger adapter that adds extra context to all log messages."""
 
-    def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple:
+    def process(self, msg: str, kwargs: MutableMapping[str, Any]) -> tuple[str, MutableMapping[str, Any]]:
         """Add extra fields to log message."""
         # Get existing extra or create new
         extra = kwargs.get("extra", {})
@@ -182,7 +185,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         return msg, kwargs
 
 
-def set_correlation_id(correlation_id: Optional[str] = None) -> str:
+def set_correlation_id(correlation_id: str | None = None) -> str:
     """Set correlation ID for current context.
 
     Args:
@@ -207,17 +210,17 @@ def set_worker_id(worker_id: str) -> None:
     worker_id_var.set(worker_id)
 
 
-def get_correlation_id() -> Optional[str]:
+def get_correlation_id() -> str | None:
     """Get current correlation ID."""
     return correlation_id_var.get()
 
 
-def get_job_id() -> Optional[str]:
+def get_job_id() -> str | None:
     """Get current job ID."""
     return job_id_var.get()
 
 
-def get_worker_id() -> Optional[str]:
+def get_worker_id() -> str | None:
     """Get current worker ID."""
     return worker_id_var.get()
 

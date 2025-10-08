@@ -1,19 +1,18 @@
 """High-performance data processing pipeline with streaming and multiprocessing."""
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, as_completed
+
+import logging
+import time
+from collections.abc import Callable, Iterator
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional, Union
-import time
-import logging
 
 import polars as pl
-import pyarrow as pa
-import pyarrow.parquet as pq
+import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
+from ..utils.s3 import S3Storage, resolve_path
 from .processor import ProcessorConfig
-from .storage import StorageHandler, ChunkWriter
-from ..utils.s3 import resolve_path, S3Storage
+from .storage import ChunkWriter, StorageHandler
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PipelineStats:
     """Statistics for pipeline execution."""
+
     total_records: int = 0
     processed_records: int = 0
     failed_records: int = 0
@@ -38,8 +38,8 @@ class StreamProcessor:
 
     def stream_parquet(
         self,
-        file_path: Union[str, Path],
-        chunk_size: Optional[int] = None,
+        file_path: str | Path,
+        chunk_size: int | None = None,
     ) -> Iterator[pl.DataFrame]:
         """Stream Parquet file in chunks.
 
@@ -60,14 +60,14 @@ class StreamProcessor:
         if storage_options:
             # S3/MinIO path - use pyarrow with storage options
             logger.info(f"Streaming from S3: {resolved_path}")
-            import pyarrow.fs as pafs
+            import pyarrow.fs as pafs  # type: ignore[import-untyped]
 
             # Create S3 filesystem
             s3fs = pafs.S3FileSystem(
-                access_key=storage_options['key'],
-                secret_key=storage_options['secret'],
-                endpoint_override=storage_options.get('endpoint_url'),
-                region=storage_options.get('client_kwargs', {}).get('region_name', 'us-east-1')
+                access_key=storage_options["key"],
+                secret_key=storage_options["secret"],
+                endpoint_override=storage_options.get("endpoint_url"),
+                region=storage_options.get("client_kwargs", {}).get("region_name", "us-east-1"),
             )
 
             # Parse S3 path
@@ -84,13 +84,13 @@ class StreamProcessor:
 
         for batch in parquet_file.iter_batches(batch_size=chunk_size):
             # Convert to Polars for efficient processing
-            yield pl.from_arrow(batch)
+            yield pl.from_arrow(batch)  # type: ignore[misc]
             self.stats.chunks_processed += 1
 
     def stream_json(
         self,
-        file_path: Union[str, Path],
-        chunk_size: Optional[int] = None,
+        file_path: str | Path,
+        chunk_size: int | None = None,
     ) -> Iterator[pl.DataFrame]:
         """Stream JSON file in chunks.
 
@@ -124,8 +124,8 @@ class StreamProcessor:
 
     def stream_csv(
         self,
-        file_path: Union[str, Path],
-        chunk_size: Optional[int] = None,
+        file_path: str | Path,
+        chunk_size: int | None = None,
     ) -> Iterator[pl.DataFrame]:
         """Stream CSV file in chunks.
 
@@ -162,7 +162,7 @@ class Pipeline:
         self.processors: list[Callable] = []
         self._checkpoints: dict[int, Path] = {}
 
-    def add_processor(self, processor: Callable[[pl.DataFrame], pl.DataFrame]) -> 'Pipeline':
+    def add_processor(self, processor: Callable[[pl.DataFrame], pl.DataFrame]) -> "Pipeline":
         """Add a processing function to the pipeline.
 
         Args:
@@ -178,7 +178,7 @@ class Pipeline:
         self,
         chunk: pl.DataFrame,
         chunk_id: int,
-    ) -> tuple[int, pl.DataFrame, Optional[Exception]]:
+    ) -> tuple[int, pl.DataFrame, Exception | None]:
         """Process a single chunk through all processors.
 
         Args:
@@ -198,8 +198,8 @@ class Pipeline:
 
     def process_file(
         self,
-        input_path: Union[str, Path],
-        output_path: Union[str, Path],
+        input_path: str | Path,
+        output_path: str | Path,
         file_type: str = "parquet",
         enable_multiprocessing: bool = True,
     ) -> PipelineStats:

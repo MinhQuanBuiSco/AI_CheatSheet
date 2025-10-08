@@ -1,28 +1,27 @@
 """Comprehensive tests for logging configuration module."""
+
 import json
 import logging
 from io import StringIO
 
-import pytest
-
+from data_processing.exceptions import FileNotFoundError
 from data_processing.logging_config import (
-    StructuredFormatter,
     HumanReadableFormatter,
     LoggerAdapter,
-    setup_logging,
+    StructuredFormatter,
+    correlation_id_var,
+    get_correlation_id,
+    get_job_id,
     get_logger,
+    get_worker_id,
+    job_id_var,
+    log_exception,
     set_correlation_id,
     set_job_id,
     set_worker_id,
-    get_correlation_id,
-    get_job_id,
-    get_worker_id,
-    log_exception,
-    correlation_id_var,
-    job_id_var,
+    setup_logging,
     worker_id_var,
 )
-from data_processing.exceptions import DataProcessingError, FileNotFoundError
 
 
 class TestStructuredFormatter:
@@ -94,6 +93,7 @@ class TestStructuredFormatter:
             raise ValueError("Test error")
         except ValueError:
             import sys
+
             exc_info = sys.exc_info()
 
         record = logging.LogRecord(
@@ -179,10 +179,7 @@ class TestLoggingSetup:
         assert logger.level == logging.DEBUG
         assert len(logger.handlers) > 0
         # Check that a handler has StructuredFormatter
-        has_structured = any(
-            isinstance(h.formatter, StructuredFormatter)
-            for h in logger.handlers
-        )
+        has_structured = any(isinstance(h.formatter, StructuredFormatter) for h in logger.handlers)
         assert has_structured
 
     def test_setup_logging_human_format(self):
@@ -191,10 +188,7 @@ class TestLoggingSetup:
 
         assert logger.level == logging.WARNING
         # Check that a handler has HumanReadableFormatter
-        has_human = any(
-            isinstance(h.formatter, HumanReadableFormatter)
-            for h in logger.handlers
-        )
+        has_human = any(isinstance(h.formatter, HumanReadableFormatter) for h in logger.handlers)
         assert has_human
 
     def test_get_logger(self):
@@ -291,7 +285,7 @@ class TestLogException:
     def test_log_standard_exception(self):
         """Test logging standard Python exception."""
         logger = logging.getLogger("test.standard")
-        
+
         stream = StringIO()
         handler = logging.StreamHandler(stream)
         logger.addHandler(handler)
@@ -315,11 +309,11 @@ class TestIntegration:
         # Setup
         setup_logging(level="INFO", format_type="json")
         logger = get_logger("test.integration")
-        
+
         # Set context
-        corr_id = set_correlation_id("integration-test-123")
+        set_correlation_id("integration-test-123")
         set_job_id("job-integration")
-        
+
         # Capture output
         stream = StringIO()
         handler = logging.StreamHandler(stream)
@@ -332,7 +326,7 @@ class TestIntegration:
         # Verify
         output = stream.getvalue()
         log_data = json.loads(output)
-        
+
         assert log_data["correlation_id"] == "integration-test-123"
         assert log_data["job_id"] == "job-integration"
         assert log_data["message"] == "Integration test message"

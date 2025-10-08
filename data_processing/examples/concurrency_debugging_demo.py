@@ -10,6 +10,7 @@ This addresses the CLIO JD requirement: "Debug data processing pipelines that ma
 encounter difficult issues, such as concurrency inefficiencies or errors obscured by
 inter-process communications."
 """
+
 import time
 import multiprocessing as mp
 from pathlib import Path
@@ -25,6 +26,7 @@ console = Console()
 # ============================================================================
 # BUGGY VERSION - Demonstrates Common Concurrency Issues
 # ============================================================================
+
 
 class BuggySharedCounter:
     """Demonstrates race condition bug."""
@@ -56,7 +58,9 @@ def demonstrate_race_condition():
     """Demonstrate race condition bug."""
     console.print("\n[bold red]❌ BUGGY VERSION: Race Condition[/bold red]\n")
 
-    console.print("[yellow]Issue: Multiple processes incrementing shared counter without locks[/yellow]")
+    console.print(
+        "[yellow]Issue: Multiple processes incrementing shared counter without locks[/yellow]"
+    )
     console.print("[yellow]Expected: Counter = 100[/yellow]")
     console.print("[yellow]Actual: Counter will be < 100 (race condition!)[/yellow]\n")
 
@@ -106,11 +110,12 @@ def demonstrate_race_condition():
 # FIXED VERSION - Proper Synchronization
 # ============================================================================
 
+
 class FixedSharedCounter:
     """Fixed version with proper synchronization."""
 
     def __init__(self):
-        self.count = mp.Value('i', 0)  # FIX: Shared memory with lock
+        self.count = mp.Value("i", 0)  # FIX: Shared memory with lock
         self.lock = mp.Lock()  # FIX: Explicit lock
 
     def increment(self):
@@ -189,6 +194,7 @@ def demonstrate_fixed_version():
 # Inter-Process Communication Debugging
 # ============================================================================
 
+
 def buggy_ipc_worker(queue: mp.Queue, data: List[int]):
     """Demonstrates IPC error - forgetting to put results in queue."""
     # BUG: Process data but forget to send results back!
@@ -248,6 +254,7 @@ def demonstrate_ipc_debugging():
 # Performance Debugging - Identifying Bottlenecks
 # ============================================================================
 
+
 def demonstrate_performance_debugging():
     """Demonstrate debugging performance issues in concurrent processing."""
     console.print("\n[bold cyan]Performance Debugging: Finding Bottlenecks[/bold cyan]\n")
@@ -275,7 +282,9 @@ def demonstrate_performance_debugging():
 
         throughput = num_items / total_time
 
-        console.print(f"  Workers: {num_workers:2d} | Time: {total_time:.3f}s | Throughput: {throughput:.0f} items/s")
+        console.print(
+            f"  Workers: {num_workers:2d} | Time: {total_time:.3f}s | Throughput: {throughput:.0f} items/s"
+        )
 
         if num_workers > 1 and throughput < 1000:
             console.print(f"    [red]⚠ Lock contention detected![/red]")
@@ -296,6 +305,7 @@ def demonstrate_performance_debugging():
 # Real-World Example: Pipeline Debugging
 # ============================================================================
 
+
 def demonstrate_pipeline_debugging():
     """Demonstrate debugging a real data processing pipeline."""
     console.print("\n[bold cyan]Real-World: Debugging Data Pipeline[/bold cyan]\n")
@@ -303,11 +313,31 @@ def demonstrate_pipeline_debugging():
     console.print("[bold]Common Issues in Production:[/bold]\n")
 
     issues = [
-        ("[red]1. Silent failures[/red]", "Workers crash without error messages", "Use try/except with logging"),
-        ("[yellow]2. Memory leaks[/yellow]", "Workers consume increasing memory", "Monitor with psutil, cleanup resources"),
-        ("[red]3. Deadlocks[/red]", "Workers hang waiting for each other", "Use timeouts, avoid circular dependencies"),
-        ("[yellow]4. Load imbalance[/yellow]", "Some workers idle while others overloaded", "Use dynamic work queues"),
-        ("[red]5. Resource exhaustion[/red]", "Too many open files/connections", "Limit workers, use connection pools"),
+        (
+            "[red]1. Silent failures[/red]",
+            "Workers crash without error messages",
+            "Use try/except with logging",
+        ),
+        (
+            "[yellow]2. Memory leaks[/yellow]",
+            "Workers consume increasing memory",
+            "Monitor with psutil, cleanup resources",
+        ),
+        (
+            "[red]3. Deadlocks[/red]",
+            "Workers hang waiting for each other",
+            "Use timeouts, avoid circular dependencies",
+        ),
+        (
+            "[yellow]4. Load imbalance[/yellow]",
+            "Some workers idle while others overloaded",
+            "Use dynamic work queues",
+        ),
+        (
+            "[red]5. Resource exhaustion[/red]",
+            "Too many open files/connections",
+            "Limit workers, use connection pools",
+        ),
     ]
 
     for issue, desc, solution in issues:
@@ -327,20 +357,23 @@ def demonstrate_pipeline_debugging():
 # Main Demo
 # ============================================================================
 
+
 def main():
     """Run complete concurrency debugging demo."""
-    console.print(Panel.fit(
-        "[bold cyan]Concurrency Debugging for CLIO[/bold cyan]\n\n"
-        "Demonstrating debugging of:\n"
-        "• Race conditions\n"
-        "• Inter-process communication errors\n"
-        "• Performance bottlenecks\n"
-        "• Production pipeline issues\n\n"
-        "[yellow]This addresses CLIO JD requirement:\n"
-        "\"Debug pipelines with concurrency inefficiencies or\n"
-        "errors obscured by inter-process communications\"[/yellow]",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold cyan]Concurrency Debugging for CLIO[/bold cyan]\n\n"
+            "Demonstrating debugging of:\n"
+            "• Race conditions\n"
+            "• Inter-process communication errors\n"
+            "• Performance bottlenecks\n"
+            "• Production pipeline issues\n\n"
+            "[yellow]This addresses CLIO JD requirement:\n"
+            '"Debug pipelines with concurrency inefficiencies or\n'
+            'errors obscured by inter-process communications"[/yellow]',
+            border_style="cyan",
+        )
+    )
 
     # Demo 1: Race condition
     demonstrate_race_condition()
@@ -358,23 +391,25 @@ def main():
     demonstrate_pipeline_debugging()
 
     # Summary
-    console.print("\n" + "="*70)
-    console.print(Panel.fit(
-        "[bold green]Key Takeaways: Concurrency Debugging[/bold green]\n\n"
-        "1. [green]Race Conditions:[/green] Use locks/semaphores for shared state\n"
-        "2. [green]IPC Errors:[/green] Always send results, use timeouts\n"
-        "3. [green]Performance:[/green] Profile, minimize contention\n"
-        "4. [green]Production:[/green] Log everything, monitor metrics\n"
-        "5. [green]Debugging:[/green] Reproduce, isolate, fix, verify\n\n"
-        "[cyan]These skills are essential for maintaining CLIO's\n"
-        "large-scale, concurrent data processing infrastructure![/cyan]",
-        border_style="green"
-    ))
-    console.print("="*70 + "\n")
+    console.print("\n" + "=" * 70)
+    console.print(
+        Panel.fit(
+            "[bold green]Key Takeaways: Concurrency Debugging[/bold green]\n\n"
+            "1. [green]Race Conditions:[/green] Use locks/semaphores for shared state\n"
+            "2. [green]IPC Errors:[/green] Always send results, use timeouts\n"
+            "3. [green]Performance:[/green] Profile, minimize contention\n"
+            "4. [green]Production:[/green] Log everything, monitor metrics\n"
+            "5. [green]Debugging:[/green] Reproduce, isolate, fix, verify\n\n"
+            "[cyan]These skills are essential for maintaining CLIO's\n"
+            "large-scale, concurrent data processing infrastructure![/cyan]",
+            border_style="green",
+        )
+    )
+    console.print("=" * 70 + "\n")
 
 
 if __name__ == "__main__":
     # Avoid issues with multiprocessing on macOS
-    mp.set_start_method('fork', force=True)
+    mp.set_start_method("fork", force=True)
 
     main()

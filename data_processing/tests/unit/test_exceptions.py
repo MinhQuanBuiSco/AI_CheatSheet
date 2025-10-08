@@ -1,45 +1,45 @@
 """Comprehensive tests for custom exceptions module."""
-import pytest
+
 
 from data_processing.exceptions import (
+    AnonymizationError,
+    # API
+    APIError,
+    AuditLogError,
+    # Configuration
+    ConfigurationError,
     # Base
     DataProcessingError,
-    # Storage
-    StorageError,
+    DataValidationError,
+    # Distributed
+    DistributedError,
+    EncryptionError,
     FileNotFoundError,
     FileReadError,
     FileWriteError,
-    S3ConnectionError,
-    # Processing
-    ProcessingError,
-    InvalidDataFormatError,
-    DataValidationError,
-    ProcessorError,
-    # Privacy
-    PrivacyError,
-    PIIDetectionError,
-    AnonymizationError,
-    EncryptionError,
-    AuditLogError,
-    # Distributed
-    DistributedError,
-    SparkConnectionError,
-    SparkJobError,
-    SparkWorkerError,
-    SparkResourceError,
-    # Configuration
-    ConfigurationError,
     InvalidConfigError,
-    MissingConfigError,
-    # Resource
-    ResourceError,
-    OutOfMemoryError,
-    TimeoutError,
-    # API
-    APIError,
+    InvalidDataFormatError,
     InvalidRequestError,
     JobNotFoundError,
+    MissingConfigError,
+    OutOfMemoryError,
+    PIIDetectionError,
+    # Privacy
+    PrivacyError,
+    # Processing
+    ProcessingError,
+    ProcessorError,
     RateLimitError,
+    # Resource
+    ResourceError,
+    S3ConnectionError,
+    SparkConnectionError,
+    SparkJobError,
+    SparkResourceError,
+    SparkWorkerError,
+    # Storage
+    StorageError,
+    TimeoutError,
 )
 
 

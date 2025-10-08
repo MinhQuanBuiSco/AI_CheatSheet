@@ -1,4 +1,5 @@
 """Tests for core pipeline functionality."""
+
 import tempfile
 from pathlib import Path
 
@@ -11,11 +12,13 @@ from data_processing.core import Pipeline, ProcessorConfig
 @pytest.fixture
 def sample_data():
     """Create sample data for testing."""
-    return pl.DataFrame({
-        "id": list(range(1000)),
-        "value": list(range(1000, 2000)),
-        "text": [f"Sample text {i}" for i in range(1000)],
-    })
+    return pl.DataFrame(
+        {
+            "id": list(range(1000)),
+            "value": list(range(1000, 2000)),
+            "text": [f"Sample text {i}" for i in range(1000)],
+        }
+    )
 
 
 @pytest.fixture

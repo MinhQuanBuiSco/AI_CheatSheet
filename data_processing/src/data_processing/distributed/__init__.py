@@ -1,6 +1,7 @@
 """Distributed processing with PySpark."""
-from .spark_engine import SparkEngine, SparkConfig, SPARK_AVAILABLE
+
 from .distributed_pipeline import DistributedPipeline, ProcessingMode
+from .spark_engine import SPARK_AVAILABLE, SparkConfig, SparkEngine
 
 __all__ = [
     "SparkEngine",

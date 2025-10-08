@@ -9,6 +9,7 @@ Demonstrates CLIO-style privacy-preserving data analysis:
 
 This shows how to analyze Claude usage while protecting user privacy.
 """
+
 from pathlib import Path
 from typing import Dict, Any
 import polars as pl
@@ -86,16 +87,23 @@ def anonymize_logs(df: pl.DataFrame, output_path: str) -> pl.DataFrame:
     console.print("Anonymizing PII in messages...")
 
     anonymized_df, stats = hash_anonymizer.anonymize_dataframe(
-        df,
-        text_columns=["user_message", "assistant_response"]
+        df, text_columns=["user_message", "assistant_response"]
     )
 
     # Also hash/mask direct PII fields
-    anonymized_df = anonymized_df.with_columns([
-        pl.col("user_name").map_elements(lambda x: hash_anonymizer.anonymize_text(str(x))[0], return_dtype=pl.Utf8).alias("user_name_hashed"),
-        pl.col("user_email").map_elements(lambda x: hash_anonymizer.anonymize_text(str(x))[0], return_dtype=pl.Utf8).alias("user_email_hashed"),
-        pl.col("user_ip").map_elements(lambda x: mask_anonymizer.anonymize_text(str(x))[0], return_dtype=pl.Utf8).alias("user_ip_masked"),
-    ])
+    anonymized_df = anonymized_df.with_columns(
+        [
+            pl.col("user_name")
+            .map_elements(lambda x: hash_anonymizer.anonymize_text(str(x))[0], return_dtype=pl.Utf8)
+            .alias("user_name_hashed"),
+            pl.col("user_email")
+            .map_elements(lambda x: hash_anonymizer.anonymize_text(str(x))[0], return_dtype=pl.Utf8)
+            .alias("user_email_hashed"),
+            pl.col("user_ip")
+            .map_elements(lambda x: mask_anonymizer.anonymize_text(str(x))[0], return_dtype=pl.Utf8)
+            .alias("user_ip_masked"),
+        ]
+    )
 
     # Drop original PII columns
     anonymized_df = anonymized_df.drop(["user_name", "user_email", "user_ip"])
@@ -119,11 +127,17 @@ def aggregate_analytics(df: pl.DataFrame) -> Dict[str, Any]:
 
     # 1. Conversation type distribution
     console.print("[bold]1. Conversation Type Distribution:[/bold]")
-    type_dist = df.group_by("conversation_type").agg([
-        pl.count().alias("count"),
-        pl.col("total_tokens").mean().alias("avg_tokens"),
-        pl.col("message_count").mean().alias("avg_messages"),
-    ]).sort("count", descending=True)
+    type_dist = (
+        df.group_by("conversation_type")
+        .agg(
+            [
+                pl.count().alias("count"),
+                pl.col("total_tokens").mean().alias("avg_tokens"),
+                pl.col("message_count").mean().alias("avg_messages"),
+            ]
+        )
+        .sort("count", descending=True)
+    )
 
     type_table = Table(show_header=True, header_style="bold magenta")
     type_table.add_column("Type", style="cyan")
@@ -136,7 +150,7 @@ def aggregate_analytics(df: pl.DataFrame) -> Dict[str, Any]:
             row["conversation_type"],
             f"{row['count']:,}",
             f"{row['avg_tokens']:.0f}",
-            f"{row['avg_messages']:.1f}"
+            f"{row['avg_messages']:.1f}",
         )
 
     console.print(type_table)
@@ -151,7 +165,9 @@ def aggregate_analytics(df: pl.DataFrame) -> Dict[str, Any]:
 
     # 3. Regional distribution
     console.print("\n[bold]3. Regional Distribution:[/bold]")
-    region_dist = df.group_by("region").agg(pl.count().alias("count")).sort("count", descending=True)
+    region_dist = (
+        df.group_by("region").agg(pl.count().alias("count")).sort("count", descending=True)
+    )
 
     for row in region_dist.iter_rows(named=True):
         pct = row["count"] / len(df) * 100
@@ -161,11 +177,9 @@ def aggregate_analytics(df: pl.DataFrame) -> Dict[str, Any]:
     console.print("\n[bold]4. Temporal Patterns:[/bold]")
 
     # Add hour of day
-    df_temporal = df.with_columns([
-        pl.col("timestamp").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f").alias("dt")
-    ]).with_columns([
-        pl.col("dt").dt.hour().alias("hour")
-    ])
+    df_temporal = df.with_columns(
+        [pl.col("timestamp").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f").alias("dt")]
+    ).with_columns([pl.col("dt").dt.hour().alias("hour")])
 
     hourly = df_temporal.group_by("hour").agg(pl.count().alias("count")).sort("hour")
 
@@ -180,12 +194,14 @@ def aggregate_analytics(df: pl.DataFrame) -> Dict[str, Any]:
     console.print(f"  Total conversations: {len(df):,}")
     console.print(f"  Total tokens: {df['total_tokens'].sum():,}")
     console.print(f"  Avg tokens per conversation: {df['total_tokens'].mean():.0f}")
-    console.print(f"  Avg session duration: {df['session_duration_seconds'].mean() / 60:.1f} minutes")
+    console.print(
+        f"  Avg session duration: {df['session_duration_seconds'].mean() / 60:.1f} minutes"
+    )
 
     return {
         "type_distribution": type_dist,
         "model_distribution": model_dist,
-        "region_distribution": region_dist
+        "region_distribution": region_dist,
     }
 
 
@@ -207,8 +223,7 @@ def cluster_conversations(df: pl.DataFrame, output_path: str) -> pl.DataFrame:
 
     # Cluster by user messages
     clustered_df = clusterer.cluster_dataframe(
-        df.head(5000),  # Sample for demo speed
-        text_column="user_message"
+        df.head(5000), text_column="user_message"  # Sample for demo speed
     )
 
     # Get cluster summaries
@@ -217,7 +232,9 @@ def cluster_conversations(df: pl.DataFrame, output_path: str) -> pl.DataFrame:
     console.print("[green]✓ Clustering complete[/green]\n")
 
     # Display cluster distribution
-    cluster_table = Table(title="Topic Clusters Discovered", show_header=True, header_style="bold magenta")
+    cluster_table = Table(
+        title="Topic Clusters Discovered", show_header=True, header_style="bold magenta"
+    )
     cluster_table.add_column("Cluster", justify="center", style="cyan")
     cluster_table.add_column("Size", justify="right", style="green")
     cluster_table.add_column("% of Total", justify="right", style="yellow")
@@ -226,10 +243,7 @@ def cluster_conversations(df: pl.DataFrame, output_path: str) -> pl.DataFrame:
     for cluster_id, summary in sorted(summaries.items()):
         sample = summary["samples"][0][:60] + "..." if summary["samples"] else "N/A"
         cluster_table.add_row(
-            str(cluster_id),
-            str(summary["size"]),
-            f"{summary['percentage']:.1f}%",
-            sample
+            str(cluster_id), str(summary["size"]), f"{summary['percentage']:.1f}%", sample
         )
 
     console.print(cluster_table)
@@ -287,15 +301,17 @@ def generate_privacy_report(pii_stats: Dict, analytics: Dict):
 
 def main():
     """Run privacy-preserving analytics demo."""
-    console.print(Panel.fit(
-        "[bold cyan]Privacy-Preserving Claude Usage Analytics[/bold cyan]\n\n"
-        "Demonstrating CLIO-style privacy-preserving data analysis:\n"
-        "• PII detection and anonymization\n"
-        "• Aggregated analytics (no individual exposure)\n"
-        "• Topic clustering\n"
-        "• Compliance reporting",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold cyan]Privacy-Preserving Claude Usage Analytics[/bold cyan]\n\n"
+            "Demonstrating CLIO-style privacy-preserving data analysis:\n"
+            "• PII detection and anonymization\n"
+            "• Aggregated analytics (no individual exposure)\n"
+            "• Topic clustering\n"
+            "• Compliance reporting",
+            border_style="cyan",
+        )
+    )
 
     # Paths
     input_file = Path("demo_data/claude_usage_logs.parquet")
@@ -325,8 +341,7 @@ def main():
 
     # Step 4: Cluster topics
     clustered_df = cluster_conversations(
-        anonymized_df,
-        str(output_dir / "clustered_conversations.parquet")
+        anonymized_df, str(output_dir / "clustered_conversations.parquet")
     )
 
     # Step 5: Privacy report
@@ -345,7 +360,9 @@ def main():
     console.print("  4. [green]Full audit trail maintained[/green]")
     console.print("  5. [green]Semantic clustering provides insights[/green]")
 
-    console.print("\n[cyan]This demonstrates how CLIO analyzes Claude usage while protecting user privacy![/cyan]\n")
+    console.print(
+        "\n[cyan]This demonstrates how CLIO analyzes Claude usage while protecting user privacy![/cyan]\n"
+    )
 
 
 if __name__ == "__main__":

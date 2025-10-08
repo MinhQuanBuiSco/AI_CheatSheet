@@ -1,6 +1,5 @@
 """Tests for monitoring/metrics module."""
-import pytest
-from prometheus_client import REGISTRY
+
 
 from data_processing.monitoring.metrics import MetricsCollector
 
