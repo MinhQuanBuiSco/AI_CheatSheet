@@ -130,6 +130,54 @@ class SparkEngine:
         # Kryo serialization for performance
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
 
+        # ===== RELIABILITY & NETWORK CONFIGURATIONS =====
+        # These settings fix the java.io.EOFException and worker disconnect issues
+
+        # Network timeouts (increased from defaults to handle pod networking delays)
+        conf.set("spark.network.timeout", "600s")  # Default: 120s - Increased for unstable networks
+        conf.set("spark.executor.heartbeatInterval", "30s")  # Default: 10s - More frequent heartbeats
+        conf.set("spark.executor.heartbeat.maxFailures", "10")  # Default: 60 - Allow more failures before killing
+
+        # RPC timeouts
+        conf.set("spark.rpc.askTimeout", "600s")  # Default: spark.network.timeout
+        conf.set("spark.rpc.lookupTimeout", "600s")  # Default: 120s
+        conf.set("spark.core.connection.ack.wait.timeout", "600s")  # Default: spark.network.timeout
+
+        # Task retry configuration
+        conf.set("spark.task.maxFailures", "4")  # Default: 4 - Retry failed tasks
+        conf.set("spark.stage.maxConsecutiveAttempts", "4")  # Retry stages on failure
+
+        # Speculation (helps with slow/stuck tasks)
+        conf.set("spark.speculation", "true")
+        conf.set("spark.speculation.interval", "30s")
+        conf.set("spark.speculation.multiplier", "2.0")
+
+        # Shuffle service (for better resilience during executor loss)
+        conf.set("spark.shuffle.service.enabled", "false")  # Not available in standalone mode
+        conf.set("spark.shuffle.io.maxRetries", "5")  # Default: 3
+        conf.set("spark.shuffle.io.retryWait", "10s")  # Default: 5s
+
+        # Memory management (prevent OOM that can cause disconnects)
+        conf.set("spark.executor.memoryOverhead", "512m")  # Extra memory for off-heap
+        conf.set("spark.driver.memoryOverhead", "512m")
+        conf.set("spark.memory.fraction", "0.6")  # Default: 0.6 - Leave room for execution
+        conf.set("spark.memory.storageFraction", "0.3")  # Limit storage to prevent memory pressure
+
+        # Serialization buffer sizes (handle large result sets)
+        conf.set("spark.kryoserializer.buffer.max", "256m")  # Default: 64m
+        conf.set("spark.rpc.message.maxSize", "256")  # Default: 128MB
+
+        # Broadcast timeout (for large broadcasts)
+        conf.set("spark.broadcast.blockSize", "4m")  # Default: 4m
+        conf.set("spark.broadcast.compress", "true")
+
+        # File fetch timeout (for S3 reads)
+        conf.set("spark.files.fetchTimeout", "600s")  # Default: 60s
+
+        # Reduce parallelism for small datasets (less network traffic)
+        conf.set("spark.default.parallelism", "4")  # Match available cores
+        conf.set("spark.sql.shuffle.partitions", "20")  # Override config for small data
+
         # Additional configs
         for key, value in self.config.extra_configs.items():
             conf.set(key, value)

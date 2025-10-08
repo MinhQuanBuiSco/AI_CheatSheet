@@ -27,7 +27,7 @@ def temp_output_dir():
 
 def test_pipeline_creation():
     """Test pipeline can be created."""
-    config = ProcessorConfig(chunk_size=100, num_workers=2)
+    config = ProcessorConfig(chunk_size=1000, batch_size=100, num_workers=2)
     pipeline = Pipeline(config)
     assert pipeline is not None
     assert len(pipeline.processors) == 0
@@ -52,7 +52,7 @@ def test_pipeline_process_file(sample_data, temp_output_dir):
     sample_data.write_parquet(input_file)
 
     # Create pipeline
-    config = ProcessorConfig(chunk_size=100, num_workers=2)
+    config = ProcessorConfig(chunk_size=1000, batch_size=100, num_workers=2)
     pipeline = Pipeline(config)
 
     # Add simple processor
@@ -79,7 +79,7 @@ def test_pipeline_multiprocessing(sample_data, temp_output_dir):
     input_file = temp_output_dir / "input.parquet"
     sample_data.write_parquet(input_file)
 
-    config = ProcessorConfig(chunk_size=200, num_workers=2)
+    config = ProcessorConfig(chunk_size=2000, batch_size=200, num_workers=2)
     pipeline = Pipeline(config)
 
     stats = pipeline.process_file(

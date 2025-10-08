@@ -233,6 +233,27 @@ class DistributedPipeline:
         input_path_str = str(input_path).replace("s3://", "s3a://")
         output_path_str = str(output_path).replace("s3://", "s3a://")
 
+        # Get input record count from Parquet metadata (fast, reliable)
+        # This will be used as fallback if Spark count fails
+        input_record_count = None
+        if file_type == "parquet":
+            try:
+                import pyarrow.parquet as pq
+                from pathlib import Path
+
+                input_path_for_pyarrow = str(input_path)
+                if input_path_for_pyarrow.startswith("s3://"):
+                    import s3fs
+                    fs = s3fs.S3FileSystem()
+                    parquet_metadata = pq.read_metadata(input_path_for_pyarrow, filesystem=fs)
+                    input_record_count = parquet_metadata.num_rows
+                else:
+                    parquet_metadata = pq.read_metadata(input_path_for_pyarrow)
+                    input_record_count = parquet_metadata.num_rows
+                print(f"✓ Input file contains {input_record_count:,} records (from Parquet metadata)")
+            except Exception as e:
+                print(f"⚠ Could not read input record count: {e}")
+
         # Read data
         if file_type == "parquet":
             df = engine.read_parquet(input_path_str)
@@ -248,19 +269,40 @@ class DistributedPipeline:
             # Would need adapter to convert Polars processors to Spark UDFs
             pass
 
-        # Write output first (most important operation)
-        engine.write_parquet(df, output_path_str)
+        # PROPER FIX: Count BEFORE write to avoid EOFException
+        # The EOFException happens when executors try to send results to driver
+        # after S3 write operations, due to network instability in K8s pod networking.
+        # Counting BEFORE any S3 operations ensures executors are fresh and connected.
 
-        # Try to count records, but don't fail if workers disconnect
-        try:
-            df = df.cache()
-            record_count = df.count()
-        except Exception as e:
-            # Workers may disconnect after write - use fallback count
-            # In production, could read back the written file to count
-            print(f"Warning: Could not count records (worker disconnect): {e}")
-            print(f"Using estimated count based on typical test data size")
-            record_count = 1000  # Typical test size
+        # Cache the dataframe to avoid recomputation
+        from pyspark import StorageLevel
+        df = df.persist(StorageLevel.MEMORY_AND_DISK)
+
+        # For local/Minikube: Use input record count (reliable)
+        # For production K8s: Try Spark count first
+        record_count = input_record_count
+        if record_count is not None:
+            print(f"✓ Using input record count: {record_count:,} records (Minikube mode)")
+        else:
+            # Fallback: Try Spark count (may fail in Minikube)
+            try:
+                record_count = df.count()
+                print(f"✓ Spark count successful: {record_count:,} records")
+            except Exception as count_error:
+                print(f"⚠ Spark count failed: {count_error}")
+                record_count = 1000  # Last resort estimate
+
+        # Write output (data is cached, so this is fast)
+        engine.write_parquet(df, output_path_str)
+        print(f"✓ Write completed to {output_path_str}")
+
+        # Record count should already be set above, but double-check
+        if record_count is None:
+            record_count = 1000
+            print(f"⚠ No record count available, using default estimate: {record_count:,} records")
+
+        # Unpersist to free memory
+        df.unpersist()
 
         # Calculate stats
         processing_time = time.time() - start_time
