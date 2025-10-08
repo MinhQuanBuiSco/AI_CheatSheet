@@ -1,0 +1,292 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alert-rules
+  namespace: data-processing
+  labels:
+    app: prometheus
+    component: monitoring
+data:
+  alert-rules.yml: |
+    # Anthropic-level Alert Rules
+    # Production-grade alerting for research infrastructure
+
+    groups:
+    # ============================================================
+    # PROCESSING PERFORMANCE ALERTS
+    # ============================================================
+    - name: processing_performance
+      interval: 30s
+      rules:
+
+      - alert: HighProcessingLatency
+        expr: histogram_quantile(0.95, rate(processing_duration_seconds_bucket[5m])) > 60
+        for: 5m
+        labels:
+          severity: warning
+          component: pipeline
+        annotations:
+          summary: "High processing latency detected"
+          description: "P95 processing latency is {{ $value }}s (threshold: 60s) for stage {{ $labels.stage }}"
+
+      - alert: LowThroughput
+        expr: throughput_records_per_second < 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: pipeline
+        annotations:
+          summary: "Processing throughput is low"
+          description: "Throughput is {{ $value }} records/sec (threshold: 1000) for stage {{ $labels.stage }}"
+
+      - alert: HighFailureRate
+        expr: |
+          rate(records_processed_total{status="failed"}[5m])
+          /
+          rate(records_processed_total[5m])
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: pipeline
+        annotations:
+          summary: "High record processing failure rate"
+          description: "Failure rate is {{ $value | humanizePercentage }} (threshold: 5%) for stage {{ $labels.stage }}"
+
+      - alert: PipelineQueueBacklog
+        expr: pipeline_queue_depth > 100000
+        for: 10m
+        labels:
+          severity: warning
+          component: pipeline
+        annotations:
+          summary: "Large pipeline queue backlog"
+          description: "Queue depth is {{ $value }} items (threshold: 100000) for stage {{ $labels.stage }}"
+
+    # ============================================================
+    # DATA QUALITY ALERTS
+    # ============================================================
+    - name: data_quality
+      interval: 60s
+      rules:
+
+      - alert: LowDataQualityScore
+        expr: data_quality_score < 0.7
+        for: 15m
+        labels:
+          severity: warning
+          component: quality
+        annotations:
+          summary: "Data quality score is low"
+          description: "Quality score is {{ $value }} (threshold: 0.7) for dataset {{ $labels.dataset }}"
+
+      - alert: HighSchemaValidationFailures
+        expr: rate(schema_validation_failures_total[10m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: quality
+        annotations:
+          summary: "High rate of schema validation failures"
+          description: "{{ $value }} validation failures/sec for field {{ $labels.field }}"
+
+      - alert: StaleData
+        expr: data_freshness_seconds > 86400
+        for: 1h
+        labels:
+          severity: info
+          component: quality
+        annotations:
+          summary: "Data is stale"
+          description: "Data from {{ $labels.source }} is {{ $value | humanizeDuration }} old (threshold: 24h)"
+
+    # ============================================================
+    # PRIVACY & AUDIT ALERTS
+    # ============================================================
+    - name: privacy_security
+      interval: 30s
+      rules:
+
+      - alert: PrivacyPolicyViolation
+        expr: increase(privacy_policy_violations_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: privacy
+        annotations:
+          summary: "Privacy policy violation detected"
+          description: "{{ $value }} privacy violations of type {{ $labels.violation_type }} in last 5 minutes"
+
+      - alert: HighPIIDetectionRate
+        expr: |
+          rate(pii_entities_detected_total[10m])
+          /
+          rate(records_processed_total{status="success"}[10m])
+          > 0.5
+        for: 15m
+        labels:
+          severity: info
+          component: privacy
+        annotations:
+          summary: "Unusually high PII detection rate"
+          description: "{{ $value | humanizePercentage }} of records contain PII (entity type: {{ $labels.entity_type }})"
+
+      - alert: AnonymizationFailures
+        expr: rate(anonymization_operations_total{status="failed"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: critical
+          component: privacy
+        annotations:
+          summary: "Anonymization operations are failing"
+          description: "{{ $value }} anonymization failures/sec (method: {{ $labels.method }})"
+
+      - alert: AuditLogWriteFailures
+        expr: rate(audit_log_writes_total{status="failed"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: audit
+        annotations:
+          summary: "Audit log writes are failing"
+          description: "{{ $value }} audit log write failures/sec for operation {{ $labels.operation }}"
+
+    # ============================================================
+    # STORAGE ALERTS
+    # ============================================================
+    - name: storage
+      interval: 60s
+      rules:
+
+      - alert: HighStorageLatency
+        expr: histogram_quantile(0.95, rate(storage_latency_seconds_bucket[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "High storage operation latency"
+          description: "P95 latency is {{ $value }}s (threshold: 5s) for operation {{ $labels.operation }}"
+
+      - alert: StorageOperationFailures
+        expr: rate(storage_operations_total{status="failed"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "Storage operations are failing"
+          description: "{{ $value }} storage failures/sec for operation {{ $labels.operation }}"
+
+    # ============================================================
+    # RESOURCE UTILIZATION ALERTS
+    # ============================================================
+    - name: resources
+      interval: 30s
+      rules:
+
+      - alert: HighCPUUsage
+        expr: cpu_usage_percent > 90
+        for: 10m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% (threshold: 90%)"
+
+      - alert: HighMemoryUsage
+        expr: memory_usage_bytes{type="rss"} > 8000000000  # 8GB
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanize }}B (threshold: 8GB)"
+
+      - alert: TooManyOpenFiles
+        expr: open_file_descriptors > 10000
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "Too many open file descriptors"
+          description: "{{ $value }} file descriptors open (threshold: 10000)"
+
+    # ============================================================
+    # API PERFORMANCE ALERTS
+    # ============================================================
+    - name: api_performance
+      interval: 30s
+      rules:
+
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API latency"
+          description: "P95 latency is {{ $value }}s (threshold: 2s) for {{ $labels.method }} {{ $labels.endpoint }}"
+
+      - alert: HighAPIErrorRate
+        expr: |
+          rate(http_requests_total{status_code=~"5.."}[5m])
+          /
+          rate(http_requests_total[5m])
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High API error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%) for {{ $labels.endpoint }}"
+
+    # ============================================================
+    # SPARK CLUSTER ALERTS (placeholder - requires Spark metrics)
+    # ============================================================
+    - name: spark_cluster
+      interval: 60s
+      rules:
+
+      # Note: These would need actual Spark metrics exporters
+      # Placeholder examples:
+      # - alert: SparkExecutorDown
+      #   expr: spark_executors_active < 3
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #     component: spark
+      #   annotations:
+      #     summary: "Spark executor count is low"
+
+    # ============================================================
+    # SYSTEM HEALTH ALERTS
+    # ============================================================
+    - name: system_health
+      interval: 60s
+      rules:
+
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: monitoring
+        annotations:
+          summary: "Prometheus is down"
+          description: "Prometheus has been down for more than 2 minutes"
+
+      - alert: TargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: "Scrape target is down"
+          description: "{{ $labels.job }} has been down for more than 5 minutes"

@@ -4,16 +4,13 @@ kind: Kustomization
 namespace: data-processing
 
 resources:
-- namespace.yaml
 - serviceaccount.yaml
-- configmap.yaml
-- secret.yaml
+- config.yaml
 - pvc.yaml
 - deployment.yaml
 - service.yaml
-- hpa.yaml
-- cronjob.yaml
 - minio-deployment.yaml
+- spark-cluster.yaml
 
 commonLabels:
   app.kubernetes.io/name: data-processing

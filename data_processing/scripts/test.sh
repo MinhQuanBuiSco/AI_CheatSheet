@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🧪 Run end-to-end tests
-# Assumes dev environment is already running (via dev-up.sh)
+# Assumes infrastructure is already deployed (via deploy.sh)
 set -e
 
 # Colors
@@ -19,13 +19,23 @@ echo ""
 echo "${YELLOW}[1/5] Checking services...${NC}"
 if ! curl -s --max-time 5 http://localhost:8000/health > /dev/null; then
     echo "${RED}❌ API not accessible at localhost:8000${NC}"
-    echo "${YELLOW}Did you run 'bash scripts/dev-up.sh' first?${NC}"
+    echo ""
+    echo "${YELLOW}Please ensure:${NC}"
+    echo "  1. Run deployment: bash scripts/deploy.sh"
+    echo "  2. Port-forwards are active (deploy.sh sets these up automatically)"
+    echo "  3. Or manually forward: kubectl port-forward -n data-processing svc/data-processing-api 8000:80"
+    echo ""
     exit 1
 fi
 
 if ! curl -s --max-time 5 http://localhost:9000/minio/health/live > /dev/null; then
     echo "${RED}❌ MinIO not accessible at localhost:9000${NC}"
-    echo "${YELLOW}Did you run 'bash scripts/dev-up.sh' first?${NC}"
+    echo ""
+    echo "${YELLOW}Please ensure:${NC}"
+    echo "  1. Run deployment: bash scripts/deploy.sh"
+    echo "  2. Port-forwards are active (deploy.sh sets these up automatically)"
+    echo "  3. Or manually forward: kubectl port-forward -n data-processing svc/minio 9000:9000"
+    echo ""
     exit 1
 fi
 

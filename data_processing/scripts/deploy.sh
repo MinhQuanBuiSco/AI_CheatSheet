@@ -42,13 +42,20 @@ echo ""
 # Step 2: Verify Minikube
 echo "${YELLOW}[2/8] Verifying Minikube...${NC}"
 
-if ! minikube status &>/dev/null; then
+# Check if minikube is actually running (not just exists)
+MINIKUBE_STATUS=$(minikube status -f '{{.Host}}' 2>/dev/null || echo "NotFound")
+
+if [ "$MINIKUBE_STATUS" != "Running" ]; then
     echo "${YELLOW}Starting Minikube with 12GB RAM...${NC}"
     minikube start --memory=12288 --cpus=4 --driver=docker
 else
-    # Check memory
+    # Minikube is running, check memory
     CURRENT_MEM=$(minikube ssh "cat /proc/meminfo | grep MemTotal | awk '{print \$2/1024}'" 2>/dev/null | cut -d'.' -f1)
-    if [ "$CURRENT_MEM" -lt 12288 ]; then
+
+    # Set default if empty
+    CURRENT_MEM=${CURRENT_MEM:-0}
+
+    if [ "$CURRENT_MEM" -lt 12288 ] && [ "$CURRENT_MEM" -gt 0 ]; then
         echo "${YELLOW}⚠️  Minikube has insufficient memory (${CURRENT_MEM}MB). Need 12GB.${NC}"
         echo "${YELLOW}Recreating Minikube with 12GB...${NC}"
         minikube delete
@@ -101,7 +108,7 @@ echo "${GREEN}✅ Namespace created${NC}"
 echo ""
 
 # Step 6: Apply Kubernetes manifests
-echo "${YELLOW}[6/8] Applying Kubernetes manifests...${NC}"
+echo "${YELLOW}[6/10] Applying Kubernetes manifests...${NC}"
 
 # Apply in correct order
 kubectl apply -f deployment/k8s/base/serviceaccount.yaml
@@ -112,11 +119,28 @@ kubectl apply -f deployment/k8s/base/spark-cluster.yaml
 kubectl apply -f deployment/k8s/base/service.yaml
 kubectl apply -f deployment/k8s/base/deployment.yaml
 
-echo "${GREEN}✅ Manifests applied${NC}"
+echo "${GREEN}✅ Core manifests applied${NC}"
 echo ""
 
-# Step 7: Wait for pods to be ready
-echo "${YELLOW}[7/8] Waiting for pods to be ready...${NC}"
+# Step 7: Deploy monitoring stack (Prometheus + Grafana)
+echo "${YELLOW}[7/10] Deploying monitoring stack...${NC}"
+
+# Apply Prometheus
+kubectl apply -f deployment/monitoring/prometheus/prometheus-rbac.yaml
+kubectl apply -f deployment/monitoring/prometheus/prometheus-config.yaml
+kubectl apply -f deployment/monitoring/prometheus/alert-rules.yaml
+kubectl apply -f deployment/monitoring/prometheus/prometheus-deployment.yaml
+
+# Apply Grafana
+kubectl apply -f deployment/monitoring/grafana/grafana-config.yaml
+kubectl apply -f deployment/monitoring/grafana/dashboards-configmap.yaml
+kubectl apply -f deployment/monitoring/grafana/grafana-deployment.yaml
+
+echo "${GREEN}✅ Monitoring stack deployed${NC}"
+echo ""
+
+# Step 8: Wait for core pods to be ready
+echo "${YELLOW}[8/10] Waiting for core pods to be ready...${NC}"
 
 echo "  Waiting for MinIO..."
 kubectl wait --for=condition=ready pod -l app=minio -n data-processing --timeout=120s
@@ -130,11 +154,23 @@ kubectl wait --for=condition=ready pod -l component=spark-worker -n data-process
 echo "  Waiting for API..."
 kubectl wait --for=condition=ready pod -l component=api -n data-processing --timeout=120s
 
+echo "${GREEN}✅ Core pods ready${NC}"
+echo ""
+
+# Step 9: Wait for monitoring pods
+echo "${YELLOW}[9/10] Waiting for monitoring pods...${NC}"
+
+echo "  Waiting for Prometheus..."
+kubectl wait --for=condition=ready pod -l app=prometheus -n data-processing --timeout=120s
+
+echo "  Waiting for Grafana..."
+kubectl wait --for=condition=ready pod -l app=grafana -n data-processing --timeout=120s
+
 echo "${GREEN}✅ All pods ready${NC}"
 echo ""
 
-# Step 8: Setup port-forwards
-echo "${YELLOW}[8/8] Setting up port-forwards...${NC}"
+# Step 10: Setup port-forwards
+echo "${YELLOW}[10/10] Setting up port-forwards...${NC}"
 
 # Kill existing port-forwards
 pkill -f "port-forward" 2>/dev/null || true
@@ -144,6 +180,8 @@ sleep 2
 kubectl port-forward -n data-processing svc/data-processing-api 8000:80 >/dev/null 2>&1 &
 kubectl port-forward -n data-processing svc/minio 9000:9000 9001:9001 >/dev/null 2>&1 &
 kubectl port-forward -n data-processing svc/spark-master 8080:8080 >/dev/null 2>&1 &
+kubectl port-forward -n data-processing svc/prometheus 9090:9090 >/dev/null 2>&1 &
+kubectl port-forward -n data-processing svc/grafana 3000:3000 >/dev/null 2>&1 &
 
 sleep 3
 echo "${GREEN}✅ Port-forwards established${NC}"
@@ -161,6 +199,13 @@ echo "🌐 Access points:"
 echo "  API:               http://localhost:8000/health"
 echo "  MinIO Console:     http://localhost:9001 (minioadmin/minioadmin)"
 echo "  Spark Master UI:   http://localhost:8080"
+echo "  📊 Prometheus:     http://localhost:9090"
+echo "  📈 Grafana:        http://localhost:3000 (admin/admin)"
+echo ""
+echo "🎯 Quick Start:"
+echo "  1. View Grafana dashboards:  http://localhost:3000"
+echo "  2. Run end-to-end test:      bash scripts/test.sh"
+echo "  3. Check metrics:            curl http://localhost:8000/metrics"
 echo ""
 echo "🧪 Run tests:"
 echo "  bash scripts/test.sh"
