@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+import json
 from backend.models import (
     DatasetInfo,
     Example,
@@ -110,6 +112,7 @@ def read_root():
             "/datasets": "List available datasets",
             "/datasets/{name}/example": "Get random example from dataset",
             "/evaluate": "Evaluate model prediction",
+            "/evaluate/stream": "Evaluate model prediction with streaming",
             "/models": "List available model options",
             "/model/load": "Load a model",
             "/model/current": "Get current model info"
@@ -206,6 +209,88 @@ def evaluate_prediction(request: EvaluateRequest):
         print(f"Unexpected error: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error during evaluation: {str(e)}")
+
+
+@app.post("/evaluate/stream")
+async def evaluate_prediction_stream(request: EvaluateRequest):
+    """
+    Stream model predictions as they are generated, then evaluate
+    Returns Server-Sent Events (SSE) stream
+    """
+    try:
+        # Check if model is loaded
+        if not model_client.is_loaded():
+            raise HTTPException(
+                status_code=400,
+                detail="No model loaded. Please load a model first using /model/load"
+            )
+
+        def generate():
+            try:
+                # Collect full prediction while streaming
+                full_prediction = ""
+
+                # Stream tokens (using sync generator, not async)
+                for chunk in model_client.stream_generate(
+                    prompt=request.prompt,
+                    system_prompt=request.system_prompt,
+                    max_tokens=512,
+                    temperature=0.0
+                ):
+                    full_prediction += chunk
+                    # Send token chunk immediately
+                    yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
+
+                # Evaluate the full prediction
+                score, metric, details = evaluator.evaluate(
+                    dataset=request.dataset,
+                    predicted=full_prediction,
+                    gold=request.gold_answer,
+                    choices=request.choices
+                )
+
+                # Send evaluation result
+                result = {
+                    'type': 'result',
+                    'dataset': request.dataset,
+                    'prompt': request.prompt,
+                    'gold_answer': request.gold_answer,
+                    'predicted_answer': full_prediction,
+                    'score': score,
+                    'metric': metric,
+                    'details': details
+                }
+                yield f"data: {json.dumps(result)}\n\n"
+
+                # Send done signal
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+            except Exception as e:
+                import traceback
+                print(f"Error in streaming: {str(e)}")
+                print(traceback.format_exc())
+                error_data = {
+                    'type': 'error',
+                    'message': str(e)
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"Unexpected error: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error during streaming evaluation: {str(e)}")
 
 
 @app.post("/model/load", response_model=ModelInfo)

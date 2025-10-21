@@ -1,10 +1,11 @@
 """
 Hugging Face Transformers client for local model inference
 """
-from typing import Optional
+from typing import Optional, Iterator
 import os
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from threading import Thread
+from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 
 
 class HuggingFaceClient:
@@ -117,6 +118,71 @@ class HuggingFaceClient:
             )
 
             return generated_text.strip()
+
+        except Exception as e:
+            raise RuntimeError(f"Error generating response: {str(e)}")
+
+    def stream_generate(
+        self,
+        prompt: str,
+        max_tokens: int = 512,
+        temperature: float = 0.0,
+        system_prompt: str = ""
+    ) -> Iterator[str]:
+        """Generate response from the loaded model with streaming"""
+        if self.model is None or self.tokenizer is None:
+            raise RuntimeError("No model loaded. Call load_model first.")
+
+        if self.mock_mode:
+            # Mock mode: simulate streaming
+            response = self._generate_mock_response(prompt)
+            for char in response:
+                yield char
+            return
+
+        try:
+            # Combine system prompt and user prompt
+            if system_prompt:
+                full_prompt = f"{system_prompt}\n\n{prompt}"
+            else:
+                full_prompt = prompt
+
+            # Tokenize input
+            inputs = self.tokenizer(
+                full_prompt,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=2048
+            ).to(self.device)
+
+            # Create streamer
+            streamer = TextIteratorStreamer(
+                self.tokenizer,
+                skip_prompt=True,
+                skip_special_tokens=True
+            )
+
+            # Generation kwargs
+            generation_kwargs = {
+                **inputs,
+                "max_new_tokens": max_tokens,
+                "temperature": temperature if temperature > 0 else 1.0,
+                "do_sample": temperature > 0,
+                "pad_token_id": self.tokenizer.pad_token_id,
+                "eos_token_id": self.tokenizer.eos_token_id,
+                "streamer": streamer,
+            }
+
+            # Run generation in a separate thread
+            thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
+            thread.start()
+
+            # Yield tokens as they are generated
+            for text in streamer:
+                yield text
+
+            thread.join()
 
         except Exception as e:
             raise RuntimeError(f"Error generating response: {str(e)}")
