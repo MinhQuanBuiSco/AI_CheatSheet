@@ -34,18 +34,10 @@ dataset_loader = DatasetLoader()
 evaluator = Evaluator()
 model_client = HuggingFaceClient()
 
-# Check if in mock mode
-import os
-if os.getenv("MOCK_MODE", "false").lower() == "true":
-    print("\n" + "="*60)
-    print("🧪 MOCK MODE ENABLED - Running without loading models")
-    print("   Predictions will be simulated for testing purposes")
-    print("="*60 + "\n")
-else:
-    print("\n" + "="*60)
-    print("🤗 Hugging Face Mode - Using local model inference")
-    print("   Models will be downloaded and run locally")
-    print("="*60 + "\n")
+print("\n" + "="*60)
+print("🤗 Hugging Face Mode - Using local model inference")
+print("   Models will be downloaded and run locally")
+print("="*60 + "\n")
 
 # Popular model options
 AVAILABLE_MODELS = [

@@ -2,7 +2,6 @@
 Hugging Face Transformers client for local model inference
 """
 from typing import Optional, Iterator
-import os
 import torch
 from threading import Thread
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
@@ -16,7 +15,6 @@ class HuggingFaceClient:
         self.tokenizer: Optional[AutoTokenizer] = None
         self.model_name: Optional[str] = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
 
     def load_model(self, model_name: str):
         """
@@ -25,13 +23,6 @@ class HuggingFaceClient:
             model_name: HuggingFace model identifier (e.g., 'microsoft/phi-2')
         """
         self.model_name = model_name
-
-        if self.mock_mode:
-            # In mock mode, just mark as loaded without loading the model
-            self.model = "MOCK"
-            self.tokenizer = "MOCK"
-            print(f"🧪 MOCK MODE: Model '{model_name}' loaded (simulated)")
-            return
 
         try:
             print(f"📥 Loading model '{model_name}' from Hugging Face...")
@@ -79,10 +70,6 @@ class HuggingFaceClient:
         """Generate response from the loaded model"""
         if self.model is None or self.tokenizer is None:
             raise RuntimeError("No model loaded. Call load_model first.")
-
-        if self.mock_mode:
-            # Mock mode: return simulated responses
-            return self._generate_mock_response(prompt)
 
         try:
             # Combine system prompt and user prompt
@@ -133,13 +120,6 @@ class HuggingFaceClient:
         if self.model is None or self.tokenizer is None:
             raise RuntimeError("No model loaded. Call load_model first.")
 
-        if self.mock_mode:
-            # Mock mode: simulate streaming
-            response = self._generate_mock_response(prompt)
-            for char in response:
-                yield char
-            return
-
         try:
             # Combine system prompt and user prompt
             if system_prompt:
@@ -187,29 +167,6 @@ class HuggingFaceClient:
         except Exception as e:
             raise RuntimeError(f"Error generating response: {str(e)}")
 
-    def _generate_mock_response(self, prompt: str) -> str:
-        """Generate a mock response for testing without loading model"""
-        import random
-
-        # Detect multiple choice questions
-        if any(letter in prompt for letter in [" A.", " B.", " C.", " D."]):
-            # Return a random letter for multiple choice
-            choices = ["A", "B", "C", "D"]
-            return random.choice(choices)
-
-        # Detect math questions
-        if any(word in prompt.lower() for word in ["calculate", "math", "number", "what is", "answer:"]):
-            # Return a random number
-            return str(random.randint(1, 100))
-
-        # Detect code questions
-        if any(word in prompt.lower() for word in ["def ", "function", "return", "code"]):
-            # Return a simple code snippet
-            return "def solution():\n    return True"
-
-        # Default: return a generic answer
-        return "This is a mock response for testing purposes."
-
     def is_loaded(self) -> bool:
         """Check if a model is currently loaded"""
         return self.model is not None
@@ -225,7 +182,7 @@ class HuggingFaceClient:
 
     def unload_model(self):
         """Unload the current model to free memory"""
-        if self.model is not None and not self.mock_mode:
+        if self.model is not None:
             del self.model
             del self.tokenizer
             if torch.cuda.is_available():

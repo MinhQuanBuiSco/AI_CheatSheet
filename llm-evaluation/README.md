@@ -1,20 +1,20 @@
 # LLM Evaluation Demo
 
-A full-stack application for evaluating Large Language Models on various benchmark datasets using vLLM for model serving.
+A full-stack application for evaluating Large Language Models on various benchmark datasets using Hugging Face Transformers for model serving.
 
 ## Features
 
 - **Multiple Benchmark Datasets**: Evaluate models on MMLU, GSM8K, HumanEval, HellaSwag, TruthfulQA, MATH-500, and GPQA
 - **Interactive UI**: Select datasets, view example prompts, and see evaluation results
-- **Model Selection**: Load different models dynamically via vLLM
+- **Model Selection**: Load different models dynamically from Hugging Face
 - **Automated Evaluation**: Compare model predictions with gold answers using dataset-specific metrics
-- **Real-time Results**: View gold answers, predicted answers, and scores
+- **Real-time Results**: View gold answers, predicted answers, and scores with streaming support
 
 ## Architecture
 
 ### Backend (Python + FastAPI)
 - FastAPI server with REST API endpoints
-- Integration with vLLM for model inference
+- Integration with Hugging Face Transformers for model inference
 - Dataset loaders for 7 popular benchmarks
 - Evaluation metrics tailored to each dataset type
 
@@ -28,7 +28,6 @@ A full-stack application for evaluating Large Language Models on various benchma
 - **Python 3.12+** (for backend)
 - **Node.js 22+** (for frontend)
 - **GPU** (optional - recommended for faster inference, CPU also works)
-- **MOCK MODE** available for testing without loading real models
 
 ## Setup Instructions
 
@@ -42,23 +41,14 @@ cd backend
 uv sync
 # or
 pip install -e .
-```
 
-**Option A: Run in MOCK MODE (for testing without loading models)**
-```bash
-# Quick start with mock predictions (recommended for first-time setup)
-./run_mock.sh
-# or
-MOCK_MODE=true uvicorn backend.main:app --reload --port 8000
-```
-
-**Option B: Run with Hugging Face Models (Real Inference)**
-```bash
-# Models will be downloaded from Hugging Face and run locally
+# Start the backend server
 uvicorn backend.main:app --reload --port 8000
 ```
 
 The backend API will be available at `http://localhost:8000`
+
+Models will be automatically downloaded from Hugging Face when you first load them in the UI.
 
 ### 2. Frontend Setup
 
@@ -75,30 +65,20 @@ npm run dev
 
 The frontend will be available at `http://localhost:5173`
 
-### 3. Install Dependencies and Models
-
-After installing backend dependencies (step 1), models will be automatically downloaded from Hugging Face when you first load them in the UI.
-
-**Note**:
-- Models are cached in `~/.cache/huggingface/` after first download
-- Smaller models like `microsoft/phi-2` (~5GB) work well on CPU
-- Larger models benefit from GPU (CUDA support)
-
 ## Usage
 
-### Quick Start (MOCK MODE)
-1. **Start Backend**: `cd backend && ./run_mock.sh`
-2. **Start Frontend**: `cd frontend && npm run dev`
-3. **Open Browser**: Navigate to `http://localhost:5173`
-4. Load any model (simulated) and start testing!
-
-### Production Mode (Real Hugging Face Models)
+### Quick Start
 1. **Start Backend**: `cd backend && uvicorn backend.main:app --reload --port 8000`
 2. **Start Frontend**: `cd frontend && npm run dev`
 3. **Open Browser**: Navigate to `http://localhost:5173`
 4. **Select and Load Model**: Choose a model from the dropdown (e.g., `microsoft/phi-2`)
 5. **Wait for Download**: First time will download the model from Hugging Face
 6. **Start Evaluating**: Select dataset, load example, and run predictions!
+
+**Note**:
+- Models are cached in `~/.cache/huggingface/` after first download
+- Smaller models like `microsoft/phi-2` (~5GB) work well on CPU
+- Larger models benefit from GPU (CUDA support)
 
 ### Workflow
 
@@ -161,17 +141,8 @@ VITE_API_URL=http://localhost:8000
 
 The backend can be configured through environment variables:
 
-- **MOCK_MODE**: Set to `true` to run without vLLM (simulated predictions)
-  - Multiple choice: Returns random A/B/C/D
-  - Math questions: Returns random numbers
-  - Code questions: Returns simple code snippets
 - **Default Port**: 8000
 - **CORS**: Currently allows all origins (configure for production)
-
-Example:
-```bash
-MOCK_MODE=true uvicorn backend.main:app --reload --port 8000
-```
 
 ## Development
 
@@ -213,7 +184,7 @@ npm run preview
 ### Backend Issues
 
 - **Dataset Loading Errors**: Some datasets are loaded in streaming mode. The first load may take time.
-- **vLLM Connection**: Ensure vLLM server is running and accessible at the configured URL.
+- **Model Loading**: Ensure you have enough RAM/VRAM for the selected model.
 
 ### Frontend Issues
 
@@ -222,8 +193,8 @@ npm run preview
 
 ### Model Loading
 
-- **Model Not Loading**: Verify vLLM server is running and model name is correct
-- **Timeout**: Large models may take time to load in vLLM
+- **Model Not Loading**: Verify the model name is correct on Hugging Face Hub
+- **Timeout**: Large models may take time to download and load
 
 ## Future Enhancements
 
