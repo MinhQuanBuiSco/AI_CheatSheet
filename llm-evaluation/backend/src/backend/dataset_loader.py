@@ -33,15 +33,15 @@ class DatasetLoader:
             description="Questions designed to test truthfulness and resistance to falsehoods",
             task_type="multiple_choice"
         ),
-        "MATH": DatasetInfo(
-            name="MATH-500",
-            description="Competition mathematics problems (500 sample subset)",
-            task_type="math"
-        ),
         "GPQA": DatasetInfo(
             name="GPQA",
             description="Graduate-level science questions written by domain experts",
             task_type="multiple_choice"
+        ),
+        "CNNDailyMail": DatasetInfo(
+            name="CNNDailyMail",
+            description="News article summarization dataset from CNN and Daily Mail",
+            task_type="summarization"
         ),
     }
 
@@ -76,11 +76,17 @@ Your response MUST be exactly one letter. Do not explain.""",
 
 Your response MUST be exactly one letter. Do not explain or justify your answer.""",
 
-        "MATH-500": """You are solving a competition math problem. Provide your final answer in LaTeX format using \\boxed{answer}. You may show your work, but the final answer MUST be in \\boxed{}.""",
-
         "GPQA": """You are answering a graduate-level science question. Respond with ONLY a single letter: A, B, C, or D.
 
 Your response MUST be exactly one letter. Do not provide explanations.""",
+
+        "CNNDailyMail": """You are a professional summarizer. Write a concise summary of the given article in 2-4 sentences. The summary should capture the main points and key information.
+
+Example:
+Article: [Long news article text...]
+Summary: A concise 2-4 sentence summary capturing the key points.
+
+Provide ONLY the summary, nothing else.""",
     }
 
     def __init__(self):
@@ -220,28 +226,6 @@ Your response MUST be exactly one letter. Do not provide explanations.""",
             metadata={"category": sample.get("category", "unknown")}
         )
 
-    def _load_math(self) -> Example:
-        """Load random MATH-500 example"""
-        if "math" not in self.cached_datasets:
-            ds = load_dataset("hendrycks/competition_math", split="test", streaming=True)
-            self.cached_datasets["math"] = list(ds.take(500))
-
-        sample = random.choice(self.cached_datasets["math"])
-
-        prompt = f"Problem: {sample['problem']}\n\nProvide your final answer in LaTeX format using \\boxed{{}}."
-
-        return Example(
-            dataset="MATH-500",
-            prompt=prompt,
-            system_prompt=self.SYSTEM_PROMPTS["MATH-500"],
-            choices=None,
-            gold_answer=sample["solution"],
-            metadata={
-                "level": sample["level"],
-                "type": sample["type"]
-            }
-        )
-
     def _load_gpqa(self) -> Example:
         """Load random GPQA example"""
         if "gpqa" not in self.cached_datasets:
@@ -271,4 +255,31 @@ Your response MUST be exactly one letter. Do not provide explanations.""",
             choices=choices,
             gold_answer=chr(65 + correct_idx),
             metadata={"subdomain": sample.get("Subdomain", "unknown")}
+        )
+
+    def _load_cnndailymail(self) -> Example:
+        """Load random CNN/DailyMail example"""
+        if "cnn_dailymail" not in self.cached_datasets:
+            ds = load_dataset("cnn_dailymail", "3.0.0", split="test", streaming=True)
+            self.cached_datasets["cnn_dailymail"] = list(ds.take(200))
+
+        sample = random.choice(self.cached_datasets["cnn_dailymail"])
+
+        # Truncate article if too long (to fit in context)
+        article = sample["article"]
+        if len(article) > 3000:
+            article = article[:3000] + "..."
+
+        prompt = f"Article: {article}\n\nProvide a concise summary (2-4 sentences):"
+
+        return Example(
+            dataset="CNNDailyMail",
+            prompt=prompt,
+            system_prompt=self.SYSTEM_PROMPTS["CNNDailyMail"],
+            choices=None,
+            gold_answer=sample["highlights"],
+            metadata={
+                "article_length": len(sample["article"]),
+                "summary_length": len(sample["highlights"])
+            }
         )

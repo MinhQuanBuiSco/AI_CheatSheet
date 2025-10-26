@@ -520,26 +520,249 @@ function App() {
               </div>
             </div>
 
-            {/* Evaluation Details - Collapsible */}
+            {/* Evaluation Details - Enhanced Display */}
             {evaluationResult.details && (
-              <details className="group">
-                <summary className="cursor-pointer list-none">
-                  <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-900 rounded-2xl p-5 border-2 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition-all">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <span className="text-xl">📋</span>
-                        Detailed Metrics
-                      </h3>
-                      <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+              <div>
+                {/* Universal Metric Explanation Display */}
+                {evaluationResult.details.explanation && (
+                  <div className="mb-6">
+                    <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                      <span className="text-2xl">📊</span>
+                      Metric Breakdown & Explanations
+                    </h3>
+
+                    {/* Render all explanation entries */}
+                    {Object.entries(evaluationResult.details.explanation).map(([metricName, data]: [string, any]) => {
+                      // Special handling for ROUGE scores (grid layout)
+                      if (['ROUGE-1', 'ROUGE-2', 'ROUGE-L'].includes(metricName)) {
+                        return null; // Handled separately below
+                      }
+
+                      // Generic metric card for all other metrics
+                      return (
+                        <div key={metricName} className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-2xl p-6 border-2 border-indigo-200 dark:border-indigo-700 mb-4">
+                          <h4 className="text-xl font-bold text-indigo-900 dark:text-indigo-200 mb-2">{metricName}</h4>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">{data.description}</p>
+
+                          {/* Score display */}
+                          {data.score !== undefined && (
+                            <div className="mb-4">
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Score:</span>
+                                <span className="text-3xl font-black text-indigo-900 dark:text-indigo-100">
+                                  {typeof data.score === 'number' ? (data.score * 100).toFixed(0) + '%' : data.score}
+                                </span>
+                              </div>
+                              <p className="text-sm italic text-gray-600 dark:text-gray-400 mt-2">{data.interpretation}</p>
+                            </div>
+                          )}
+
+                          {/* Similarity display (for code) */}
+                          {data.similarity !== undefined && (
+                            <div className="mb-4">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Similarity:</span>
+                                <span className="text-lg font-bold text-indigo-700 dark:text-indigo-300">{(data.similarity * 100).toFixed(1)}%</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Predicted vs Gold values */}
+                          {(data.predicted_value !== undefined || data.predicted_letter !== undefined) && (
+                            <div className="space-y-2 mb-4 bg-white/50 dark:bg-black/30 p-3 rounded-lg">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Predicted:</span>
+                                <span className="text-sm font-mono text-gray-800 dark:text-white">{data.predicted_value || data.predicted_letter}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Correct:</span>
+                                <span className="text-sm font-mono text-gray-800 dark:text-white">{data.gold_value || data.correct_letter}</span>
+                              </div>
+                              {data.absolute_difference !== undefined && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Difference:</span>
+                                  <span className="text-sm font-mono text-gray-800 dark:text-white">{data.absolute_difference}</span>
+                                </div>
+                              )}
+                              {data.tolerance !== undefined && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Tolerance:</span>
+                                  <span className="text-sm font-mono text-gray-800 dark:text-white">{data.tolerance}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Token counts (for code) */}
+                          {data.common_tokens !== undefined && (
+                            <div className="space-y-1 mb-4 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-400">Common tokens:</span>
+                                <span className="font-bold">{data.common_tokens}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-400">Predicted tokens:</span>
+                                <span className="font-bold">{data.predicted_tokens}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-400">Gold tokens:</span>
+                                <span className="font-bold">{data.gold_tokens}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Note/Warning */}
+                          {data.note && (
+                            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-3 mb-3">
+                              <p className="text-xs text-yellow-900 dark:text-yellow-200">{data.note}</p>
+                            </div>
+                          )}
+
+                          {/* How it works (collapsible) */}
+                          {(data.how_it_works || data.calculation) && (
+                            <details className="mt-3">
+                              <summary className="text-sm text-indigo-700 dark:text-indigo-400 cursor-pointer hover:underline font-semibold">How is this calculated?</summary>
+                              <div className="mt-2 space-y-2">
+                                {data.calculation && (
+                                  <div>
+                                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Formula:</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 font-mono bg-white/50 dark:bg-black/30 p-2 rounded whitespace-pre-wrap">{data.calculation}</p>
+                                  </div>
+                                )}
+                                {data.how_it_works && (
+                                  <div>
+                                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">How it works:</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 bg-white/50 dark:bg-black/30 p-2 rounded whitespace-pre-wrap">{data.how_it_works}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </details>
+                          )}
+
+                          {/* Production method reference (for code) */}
+                          {data.method === "Unit Test Execution" && (
+                            <details className="mt-3">
+                              <summary className="text-sm text-purple-700 dark:text-purple-400 cursor-pointer hover:underline font-semibold">
+                                📖 Production Evaluation Method
+                              </summary>
+                              <div className="mt-2 bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg">
+                                <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{data.how_it_works}</p>
+                                {data.why_different && (
+                                  <p className="text-xs text-purple-700 dark:text-purple-300 mt-2 italic">💡 {data.why_different}</p>
+                                )}
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* ROUGE Scores Grid (Special handling for summarization) */}
+                    {['ROUGE-1', 'ROUGE-2', 'ROUGE-L'].some(m => evaluationResult.details.explanation[m]) && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        {['ROUGE-1', 'ROUGE-2', 'ROUGE-L'].map((metric) => {
+                          const data = evaluationResult.details.explanation[metric];
+                          if (!data) return null;
+                          return (
+                          <div key={metric} className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl p-5 border-2 border-blue-200 dark:border-blue-700">
+                            <h4 className="text-lg font-bold text-blue-900 dark:text-blue-200 mb-2">{metric}</h4>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">{data.description}</p>
+
+                            <div className="space-y-2 mb-3">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Precision:</span>
+                                <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{data.precision}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Recall:</span>
+                                <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{data.recall}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">F1 Score:</span>
+                                <span className="text-lg font-black text-blue-900 dark:text-blue-100">{data.f1}</span>
+                              </div>
+                            </div>
+
+                            <div className="pt-3 border-t border-blue-300 dark:border-blue-600">
+                              <p className="text-xs text-gray-600 dark:text-gray-400 italic">{data.interpretation}</p>
+                            </div>
+
+                            <details className="mt-3">
+                              <summary className="text-xs text-blue-700 dark:text-blue-400 cursor-pointer hover:underline">How is this calculated?</summary>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 font-mono bg-white/50 dark:bg-black/30 p-2 rounded">{data.calculation}</p>
+                            </details>
+                          </div>
+                        );
+                      })}
                     </div>
+                    )}
+
+                    {/* BLEU Score (only for summarization) */}
+                    {evaluationResult.details.explanation.BLEU && (
+                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-2xl p-6 border-2 border-purple-200 dark:border-purple-700 mb-4">
+                        <h4 className="text-xl font-bold text-purple-900 dark:text-purple-200 mb-2">BLEU Score</h4>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">{evaluationResult.details.explanation.BLEU.description}</p>
+
+                        <div className="flex items-center gap-4 mb-3">
+                          <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Score:</span>
+                          <span className="text-3xl font-black text-purple-900 dark:text-purple-100">{evaluationResult.details.explanation.BLEU.score}</span>
+                          <span className="text-sm italic text-gray-600 dark:text-gray-400">{evaluationResult.details.explanation.BLEU.interpretation}</span>
+                        </div>
+
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-3 mb-3">
+                          <p className="text-xs text-yellow-900 dark:text-yellow-200">💡 {evaluationResult.details.explanation.BLEU.note}</p>
+                        </div>
+
+                        <details>
+                          <summary className="text-sm text-purple-700 dark:text-purple-400 cursor-pointer hover:underline">How is BLEU calculated?</summary>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 font-mono bg-white/50 dark:bg-black/30 p-3 rounded leading-relaxed">{evaluationResult.details.explanation.BLEU.calculation}</p>
+                        </details>
+                      </div>
+                    )}
+
+                    {/* Summary Statistics */}
+                    {evaluationResult.details.explanation.summary_statistics && (
+                      <div className="bg-gradient-to-r from-gray-50 to-slate-100 dark:from-gray-800 dark:to-slate-900 rounded-xl p-4 border border-gray-300 dark:border-gray-700">
+                        <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Summary Statistics</h4>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Predicted Length</p>
+                            <p className="text-lg font-bold text-gray-800 dark:text-white">{evaluationResult.details.explanation.summary_statistics.predicted_length} words</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Reference Length</p>
+                            <p className="text-lg font-bold text-gray-800 dark:text-white">{evaluationResult.details.explanation.summary_statistics.reference_length} words</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Length Ratio</p>
+                            <p className="text-lg font-bold text-gray-800 dark:text-white">{evaluationResult.details.explanation.summary_statistics.length_ratio}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </summary>
-                <div className="mt-4 bg-gray-900/95 dark:bg-black/95 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
-                  <pre className="text-sm text-green-400 font-mono overflow-x-auto leading-relaxed">
-                    {JSON.stringify(evaluationResult.details, null, 2)}
-                  </pre>
-                </div>
-              </details>
+                )}
+
+                {/* Raw Details - Collapsible */}
+                <details className="group">
+                  <summary className="cursor-pointer list-none">
+                    <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-900 rounded-2xl p-5 border-2 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition-all">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          <span className="text-xl">📋</span>
+                          Raw JSON Details
+                        </h3>
+                        <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                      </div>
+                    </div>
+                  </summary>
+                  <div className="mt-4 bg-gray-900/95 dark:bg-black/95 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
+                    <pre className="text-sm text-green-400 font-mono overflow-x-auto leading-relaxed">
+                      {JSON.stringify(evaluationResult.details, null, 2)}
+                    </pre>
+                  </div>
+                </details>
+              </div>
             )}
           </div>
         )}

@@ -4,10 +4,11 @@ A full-stack application for evaluating Large Language Models on various benchma
 
 ## Features
 
-- **Multiple Benchmark Datasets**: Evaluate models on MMLU, GSM8K, HumanEval, HellaSwag, TruthfulQA, MATH-500, and GPQA
+- **Multiple Benchmark Datasets**: Evaluate models on MMLU, GSM8K, HumanEval, HellaSwag, TruthfulQA, GPQA, and CNN/DailyMail
 - **Interactive UI**: Select datasets, view example prompts, and see evaluation results
 - **Model Selection**: Load different models dynamically from Hugging Face
 - **Automated Evaluation**: Compare model predictions with gold answers using dataset-specific metrics
+- **Advanced Metrics**: ROUGE and BLEU scores for summarization with detailed explanations
 - **Real-time Results**: View gold answers, predicted answers, and scores with streaming support
 
 ## Architecture
@@ -118,14 +119,20 @@ The frontend will be available at `http://localhost:5173`
 | **HumanEval** | Code Generation | Python programming problems |
 | **HellaSwag** | Multiple Choice | Commonsense reasoning |
 | **TruthfulQA** | Multiple Choice | Questions testing truthfulness |
-| **MATH-500** | Math | Competition mathematics problems |
 | **GPQA** | Multiple Choice | Graduate-level science questions |
+| **CNNDailyMail** | Summarization | News article summarization from CNN and Daily Mail |
 
 ## Evaluation Metrics
 
 - **Multiple Choice** (MMLU, HellaSwag, TruthfulQA, GPQA): Accuracy
-- **Math** (GSM8K, MATH-500): Numeric match with tolerance / String match
+- **Math** (GSM8K): Numeric match with tolerance / String match
 - **Code** (HumanEval): Simplified similarity (Note: Production would use unit test execution)
+- **Summarization** (CNNDailyMail):
+  - **ROUGE-1**: Unigram (word) overlap between prediction and reference
+  - **ROUGE-2**: Bigram (2-word phrase) overlap
+  - **ROUGE-L**: Longest common subsequence (sentence structure similarity)
+  - **BLEU**: N-gram precision with brevity penalty
+  - All metrics include detailed explanations of calculation methods and interpretations
 
 ## Configuration
 
