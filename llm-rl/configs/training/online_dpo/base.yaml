@@ -1,0 +1,81 @@
+# Online DPO Training Configuration - Base
+
+method: "online_dpo"
+
+model:
+  model_name_or_path: "gpt2"
+  model_size: "small"
+  use_peft: true
+  load_in_4bit: false
+  load_in_8bit: false
+  torch_dtype: "bfloat16"
+  trust_remote_code: false
+
+peft:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: null
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+dataset:
+  dataset_name: "ultrafeedback-binarized"
+  dataset_subset: null
+  train_split: "train"
+  eval_split: "test"
+  max_train_samples: 5000
+  max_eval_samples: 500
+  max_length: 512
+  max_prompt_length: 256
+  preprocessing_num_workers: 4
+
+training:
+  output_dir: "./outputs/online_dpo_gpt2"
+  num_train_epochs: 1
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 4
+  learning_rate: 5.0e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  max_grad_norm: 1.0
+  logging_steps: 10
+  eval_steps: 100
+  save_steps: 500
+  save_total_limit: 3
+  fp16: false
+  bf16: true
+  gradient_checkpointing: true
+  seed: 42
+  optim: "adamw_torch"
+  lr_scheduler_type: "cosine"
+  report_to: ["tensorboard"]
+  ddp_find_unused_parameters: null
+  deepspeed: null
+
+logging:
+  wandb_project: null
+  wandb_entity: null
+  wandb_run_name: null
+  tensorboard_dir: null
+  log_level: "info"
+
+# Online DPO specific parameters
+beta: 0.1
+label_smoothing: 0.0
+loss_type: "sigmoid"
+num_iterations: 5
+samples_per_prompt: 4
+reward_model_name_or_path: null  # Optional reward model for ranking
+use_self_ranking: true
+max_new_tokens: 128
+temperature: 0.9
+top_k: 50
+top_p: 0.95
+num_beams: 1
+warmup_iterations: 1
+eval_interval: 1
+save_iteration_checkpoints: true
+buffer_size: null
+replay_ratio: 0.5

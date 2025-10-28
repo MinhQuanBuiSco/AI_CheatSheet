@@ -1,0 +1,8 @@
+# GPT-2 Small Model Configuration
+model_name_or_path: "gpt2"
+model_size: "small"
+use_peft: true
+load_in_8bit: false
+load_in_4bit: false
+torch_dtype: "bfloat16"
+trust_remote_code: false

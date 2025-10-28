@@ -1,0 +1,8 @@
+# LLaMA-2 7B Model Configuration
+model_name_or_path: "meta-llama/Llama-2-7b-hf"
+model_size: "medium"
+use_peft: true
+load_in_8bit: false
+load_in_4bit: true  # Use 4-bit quantization for memory efficiency
+torch_dtype: "bfloat16"
+trust_remote_code: false
